@@ -1,15 +1,21 @@
 from decimal import Decimal
 from datetime import date
-from django.core.exceptions import PermissionDenied, ValidationError
+
+from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from django.db import transaction
-from django.http import HttpResponse
-import csv
 
-from .models import Expense, ExpenseAttachment, ExpenseApproval, ExpensePayment, ExpenseComment
-from .workflow import StateMachine, WorkflowError
-from .receivers import emit_status_signal
-from .signals import (
+from ..models import (
+    Expense,
+    ExpenseAttachment,
+    ExpenseApproval,
+    ExpensePayment,
+    ExpenseComment,
+)
+from ..constants import ExpenseStatus
+from ..exceptions import WorkflowError
+from ..workflows import ExpenseWorkflow
+from ..signals import (
     expense_created,
     expense_updated,
     expense_submitted,
@@ -18,19 +24,28 @@ from .signals import (
     expense_paid,
     expense_cancelled,
 )
+from ..hooks import HookRegistry
 
 
 class ExpenseService:
+    """Unified service layer for expense lifecycle management."""
+
     @staticmethod
     @transaction.atomic
     def create(data, user=None):
+        hooks = HookRegistry.get_hooks()
+        for hook in hooks:
+            data = hook.before_create(data, user) or data
         expense = Expense.objects.create(**data)
         expense_created.send(sender=Expense, expense=expense, user=user)
+        for hook in hooks:
+            hook.after_create(expense, user)
         return expense
 
     @staticmethod
     @transaction.atomic
     def update(expense, data, user=None):
+        _assert_editable(expense)
         for key, value in data.items():
             setattr(expense, key, value)
         expense.save()
@@ -41,9 +56,8 @@ class ExpenseService:
     @transaction.atomic
     def submit(expense, user=None):
         _assert_editable(expense)
-        state = StateMachine()
-        state.assert_allowed(expense.status, "submitted")
-        expense.status = Expense.Status.SUBMITTED
+        ExpenseWorkflow.assert_allowed(expense.status, ExpenseStatus.SUBMITTED)
+        expense.status = ExpenseStatus.SUBMITTED
         expense.date_submitted = timezone.now()
         expense.save()
         expense_submitted.send(sender=Expense, expense=expense, user=user)
@@ -53,9 +67,8 @@ class ExpenseService:
     @transaction.atomic
     def request_approval(expense, user=None):
         _assert_has_perm(user, "expenses.change_expense")
-        state = StateMachine()
-        state.assert_allowed(expense.status, "pending_approval")
-        expense.status = Expense.Status.PENDING_APPROVAL
+        ExpenseWorkflow.assert_allowed(expense.status, ExpenseStatus.PENDING_APPROVAL)
+        expense.status = ExpenseStatus.PENDING_APPROVAL
         expense.save()
         return expense
 
@@ -63,9 +76,11 @@ class ExpenseService:
     @transaction.atomic
     def approve(expense, user=None, comment=""):
         _assert_has_perm(user, "expenses.approve_expense")
-        state = StateMachine()
-        state.assert_allowed(expense.status, "approved")
-        expense.status = Expense.Status.APPROVED
+        hooks = HookRegistry.get_hooks()
+        ExpenseWorkflow.assert_allowed(expense.status, ExpenseStatus.APPROVED)
+        for hook in hooks:
+            hook.before_transition(expense, ExpenseStatus.APPROVED, user)
+        expense.status = ExpenseStatus.APPROVED
         expense.approved_by = user
         expense.date_approved = timezone.now()
         expense.save()
@@ -76,15 +91,16 @@ class ExpenseService:
             comment=comment,
         )
         expense_approved.send(sender=Expense, expense=expense, user=user)
+        for hook in hooks:
+            hook.after_transition(expense, ExpenseStatus.PENDING_APPROVAL, user)
         return expense
 
     @staticmethod
     @transaction.atomic
     def reject(expense, user=None, reason=""):
         _assert_has_perm(user, "expenses.approve_expense")
-        state = StateMachine()
-        state.assert_allowed(expense.status, "rejected")
-        expense.status = Expense.Status.REJECTED
+        ExpenseWorkflow.assert_allowed(expense.status, ExpenseStatus.REJECTED)
+        expense.status = ExpenseStatus.REJECTED
         expense.rejection_reason = reason
         expense.save()
         ExpenseApproval.objects.create(
@@ -100,31 +116,34 @@ class ExpenseService:
     @transaction.atomic
     def pay(expense, user=None, payment_data=None):
         _assert_has_perm(user, "expenses.pay_expense")
-        state = StateMachine()
-        state.assert_allowed(expense.status, "paid")
-        expense.status = Expense.Status.PAID
+        hooks = HookRegistry.get_hooks()
+        ExpenseWorkflow.assert_allowed(expense.status, ExpenseStatus.PAID)
+        pd = payment_data or {}
+        for hook in hooks:
+            pd = hook.before_pay(expense, pd, user) or pd
+        expense.status = ExpenseStatus.PAID
         expense.date_paid = timezone.now()
-        expense.payment_method = (payment_data or {}).get("payment_method", "")
+        expense.payment_method = pd.get("payment_method", "")
         expense.save()
-        ExpensePayment.objects.create(
+        payment = ExpensePayment.objects.create(
             expense=expense,
-            amount_paid=payment_data.get("amount_paid", expense.total_amount) if payment_data else expense.total_amount,
-            payment_date=payment_data.get("payment_date", date.today()) if payment_data else date.today(),
+            amount_paid=pd.get("amount_paid", expense.total_amount),
+            payment_date=pd.get("payment_date", date.today()),
             payment_method=expense.payment_method,
-            reference=payment_data.get("reference", "") if payment_data else "",
+            reference=pd.get("reference", ""),
             paid_by=user,
-            notes=payment_data.get("notes", "") if payment_data else "",
+            notes=pd.get("notes", ""),
         )
         expense_paid.send(sender=Expense, expense=expense, user=user)
+        for hook in hooks:
+            hook.after_pay(expense, payment, user)
         return expense
 
     @staticmethod
     @transaction.atomic
     def cancel(expense, user=None):
-        state = StateMachine()
-        state.assert_allowed(expense.status, "cancelled")
-        _old = expense.status
-        expense.status = Expense.Status.CANCELLED
+        ExpenseWorkflow.assert_allowed(expense.status, ExpenseStatus.CANCELLED)
+        expense.status = ExpenseStatus.CANCELLED
         expense.save()
         expense_cancelled.send(sender=Expense, expense=expense, user=user)
         return expense
@@ -132,9 +151,8 @@ class ExpenseService:
     @staticmethod
     @transaction.atomic
     def archive(expense, user=None):
-        state = StateMachine()
-        state.assert_allowed(expense.status, "archived")
-        expense.status = Expense.Status.ARCHIVED
+        ExpenseWorkflow.assert_allowed(expense.status, ExpenseStatus.ARCHIVED)
+        expense.status = ExpenseStatus.ARCHIVED
         expense.save()
         return expense
 
@@ -149,52 +167,6 @@ class ExpenseService:
         return ExpenseComment.objects.create(
             expense=expense, user=user, comment=text
         )
-
-    @staticmethod
-    def export_csv(queryset):
-        response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = "attachment; filename=expenses.csv"
-        writer = csv.writer(response)
-        writer.writerow([
-            "Reference", "Date", "Amount", "Currency", "Status",
-            "Category", "Type", "Cost Center", "Vendor", "Description",
-        ])
-        for e in queryset.select_related("expense_type__category", "cost_center"):
-            writer.writerow([
-                e.reference_number,
-                e.date_incurred,
-                e.total_amount,
-                e.currency,
-                e.get_status_display(),
-                e.expense_type.category.name if e.expense_type else "",
-                e.expense_type.name if e.expense_type else "",
-                e.cost_center.name if e.cost_center else "",
-                e.vendor,
-                e.description[:100],
-            ])
-        return response
-
-    @staticmethod
-    def report(start_date, end_date, cost_center=None):
-        qs = Expense.objects.filter(
-            date_incurred__gte=start_date, date_incurred__lte=end_date
-        )
-        if cost_center:
-            qs = qs.filter(cost_center=cost_center)
-        total = sum(e.total_amount for e in qs)
-        by_category = list(qs.total_by_category())
-        by_status = {
-            label: qs.filter(status=code).count()
-            for code, label in Expense.Status.choices
-        }
-        return {
-            "total_expenses": total,
-            "count": qs.count(),
-            "by_category": by_category,
-            "by_status": by_status,
-            "start_date": start_date,
-            "end_date": end_date,
-        }
 
 
 def _assert_editable(expense):

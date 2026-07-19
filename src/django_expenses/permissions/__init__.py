@@ -1,0 +1,6 @@
+ADD_EXPENSE = "expenses.add_expense"
+CHANGE_EXPENSE = "expenses.change_expense"
+DELETE_EXPENSE = "expenses.delete_expense"
+APPROVE_EXPENSE = "expenses.approve_expense"
+PAY_EXPENSE = "expenses.pay_expense"
+VIEW_REPORTS = "expenses.view_expense_reports"

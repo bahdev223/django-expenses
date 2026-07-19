@@ -1,12 +1,15 @@
 from django.contrib import admin
-from django.db.models import Sum, F
-from django.http import HttpResponse
 from django.utils.html import format_html
-import csv
 
 from .models import (
-    Expense, ExpenseCategory, ExpenseType, CostCenter,
-    ExpenseAttachment, ExpenseApproval, ExpensePayment, ExpenseComment,
+    Expense,
+    ExpenseCategory,
+    ExpenseType,
+    CostCenter,
+    ExpenseAttachment,
+    ExpenseApproval,
+    ExpensePayment,
+    ExpenseComment,
 )
 from .services import ExpenseService
 
@@ -21,7 +24,9 @@ class ApprovalInline(admin.TabularInline):
 class PaymentInline(admin.TabularInline):
     model = ExpensePayment
     extra = 0
-    readonly_fields = ["amount_paid", "payment_date", "payment_method", "reference", "paid_by"]
+    readonly_fields = [
+        "amount_paid", "payment_date", "payment_method", "reference", "paid_by"
+    ]
 
 
 class AttachmentInline(admin.TabularInline):
@@ -39,23 +44,50 @@ class CommentInline(admin.TabularInline):
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
     list_display = [
-        "reference_number", "colored_status", "user", "expense_type",
-        "cost_center", "amount_display", "total_display", "date_incurred",
+        "reference_number",
+        "colored_status",
+        "user",
+        "expense_type",
+        "cost_center",
+        "amount_display",
+        "total_display",
+        "date_incurred",
     ]
-    list_filter = ["status", "expense_type__category", "cost_center", "currency", "date_incurred"]
+    list_filter = [
+        "status",
+        "expense_type__category",
+        "cost_center",
+        "currency",
+        "date_incurred",
+    ]
     search_fields = ["reference_number", "description", "vendor", "user__username"]
     list_select_related = ["user", "expense_type__category", "cost_center"]
     date_hierarchy = "date_incurred"
     readonly_fields = [
-        "reference_number", "status", "date_submitted", "date_approved",
-        "date_paid", "approved_by", "created_at", "updated_at",
+        "reference_number",
+        "status",
+        "date_submitted",
+        "date_approved",
+        "date_paid",
+        "approved_by",
+        "created_at",
+        "updated_at",
     ]
     fieldsets = [
-        ("Identification", {"fields": ["reference_number", "status", "user", "expense_type", "cost_center"]}),
+        ("Identification", {
+            "fields": ["reference_number", "status", "user", "expense_type", "cost_center"]
+        }),
         ("Montants", {"fields": ["amount", "tax_amount", "currency"]}),
         ("Détails", {"fields": ["description", "vendor", "date_incurred"]}),
-        ("Paiement", {"fields": ["payment_method", "approved_by", "rejection_reason"]}),
-        ("Dates", {"fields": ["date_submitted", "date_approved", "date_paid", "created_at", "updated_at"]}),
+        ("Paiement", {
+            "fields": ["payment_method", "approved_by", "rejection_reason"]
+        }),
+        ("Dates", {
+            "fields": [
+                "date_submitted", "date_approved", "date_paid",
+                "created_at", "updated_at"
+            ]
+        }),
     ]
     inlines = [ApprovalInline, PaymentInline, AttachmentInline, CommentInline]
     actions = ["export_csv", "mark_paid", "mark_archived"]
@@ -74,7 +106,8 @@ class ExpenseAdmin(admin.ModelAdmin):
         c = colors.get(obj.status, "gray")
         return format_html(
             '<span style="color:{};font-weight:bold;">{}</span>',
-            c, obj.get_status_display()
+            c,
+            obj.get_status_display(),
         )
     colored_status.short_description = "Status"
 
@@ -91,15 +124,19 @@ class ExpenseAdmin(admin.ModelAdmin):
     export_csv.short_description = "Export CSV sélection"
 
     def mark_paid(self, request, queryset):
+        count = 0
         for expense in queryset.filter(status="approved"):
             ExpenseService.pay(expense, user=request.user)
-        self.message_user(request, f"{queryset.count()} dépenses marquées payées.")
+            count += 1
+        self.message_user(request, f"{count} dépenses marquées payées.")
     mark_paid.short_description = "Marquer comme payée(s)"
 
     def mark_archived(self, request, queryset):
+        count = 0
         for expense in queryset.filter(status="paid"):
             ExpenseService.archive(expense, user=request.user)
-        self.message_user(request, f"{queryset.count()} dépenses archivées.")
+            count += 1
+        self.message_user(request, f"{count} dépenses archivées.")
     mark_archived.short_description = "Archiver la sélection"
 
 
@@ -117,7 +154,9 @@ class ExpenseCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(ExpenseType)
 class ExpenseTypeAdmin(admin.ModelAdmin):
-    list_display = ["name", "category", "requires_approval", "max_amount", "is_active"]
+    list_display = [
+        "name", "category", "requires_approval", "max_amount", "is_active"
+    ]
     list_filter = ["category", "requires_approval", "is_active"]
     search_fields = ["name"]
     autocomplete_fields = ["category"]

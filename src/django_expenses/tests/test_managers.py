@@ -14,18 +14,27 @@ class ExpenseQuerySetTests(TestCase):
             name="Carburant", category=cls.category
         )
         Expense.objects.create(
-            user=cls.user, expense_type=cls.expense_type, amount=10000,
-            description="Draft", date_incurred="2026-07-01",
+            user=cls.user,
+            expense_type=cls.expense_type,
+            amount=10000,
+            description="Draft",
+            date_incurred="2026-07-01",
             status=Expense.Status.DRAFT,
         )
         Expense.objects.create(
-            user=cls.user, expense_type=cls.expense_type, amount=20000,
-            description="Paid", date_incurred="2026-07-02",
+            user=cls.user,
+            expense_type=cls.expense_type,
+            amount=20000,
+            description="Paid",
+            date_incurred="2026-07-02",
             status=Expense.Status.PAID,
         )
         Expense.objects.create(
-            user=cls.user, expense_type=cls.expense_type, amount=30000,
-            description="Approved", date_incurred="2026-07-03",
+            user=cls.user,
+            expense_type=cls.expense_type,
+            amount=30000,
+            description="Approved",
+            date_incurred="2026-07-03",
             status=Expense.Status.APPROVED,
         )
 

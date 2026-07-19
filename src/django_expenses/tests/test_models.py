@@ -13,7 +13,9 @@ class ExpenseModelTests(TestCase):
         cls.expense_type = ExpenseType.objects.create(
             name="Carburant", category=cls.category
         )
-        cls.cost_center = CostCenter.objects.create(code="ADMIN", name="Administration")
+        cls.cost_center = CostCenter.objects.create(
+            code="ADMIN", name="Administration"
+        )
 
     def test_create_expense(self):
         expense = Expense.objects.create(

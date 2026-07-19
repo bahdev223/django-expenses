@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models import Sum, F, Count
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
 
@@ -10,7 +12,9 @@ class ExpenseQuerySet(models.QuerySet):
         return self.filter(user=user)
 
     def by_period(self, start_date, end_date):
-        return self.filter(date_incurred__gte=start_date, date_incurred__lte=end_date)
+        return self.filter(
+            date_incurred__gte=start_date, date_incurred__lte=end_date
+        )
 
     def by_cost_center(self, cost_center):
         return self.filter(cost_center=cost_center)
@@ -34,10 +38,9 @@ class ExpenseQuerySet(models.QuerySet):
         return self.filter(status__in=["draft", "rejected"])
 
     def total_amount(self):
-        return sum(e.total_amount for e in self)
+        return self.aggregate(total=Sum(F("amount") + F("tax_amount")))["total"] or 0
 
     def total_by_category(self):
-        from django.db.models import Sum, F
         return (
             self.values("expense_type__category__name")
             .annotate(total=Sum(F("amount") + F("tax_amount")))
@@ -45,7 +48,6 @@ class ExpenseQuerySet(models.QuerySet):
         )
 
     def total_by_cost_center(self):
-        from django.db.models import Sum, F
         return (
             self.values("cost_center__code", "cost_center__name")
             .annotate(total=Sum(F("amount") + F("tax_amount")))
@@ -53,8 +55,6 @@ class ExpenseQuerySet(models.QuerySet):
         )
 
     def monthly_summary(self, year=None):
-        from django.db.models import Sum, F, Count
-        from django.db.models.functions import TruncMonth
         if year is None:
             year = timezone.now().year
         return (

@@ -1,15 +1,20 @@
 from django.urls import path
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.views.generic import (
+    ListView,
+    DetailView,
+    CreateView,
+    UpdateView,
+    DeleteView,
+)
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 
-from .models import Expense, ExpenseCategory, ExpenseType, CostCenter
+from .models import Expense
 from .services import ExpenseService
 
 
 app_name = "expenses"
 
-# ─── Expense URLs ──────────────────────────────────────────
 
 class ExpenseListView(LoginRequiredMixin, ListView):
     model = Expense
@@ -17,7 +22,9 @@ class ExpenseListView(LoginRequiredMixin, ListView):
     paginate_by = 50
 
     def get_queryset(self):
-        qs = Expense.objects.select_related("user", "expense_type__category", "cost_center")
+        qs = Expense.objects.select_related(
+            "user", "expense_type__category", "cost_center"
+        )
         status = self.request.GET.get("status")
         if status:
             qs = qs.filter(status=status)
@@ -37,15 +44,23 @@ class ExpenseDetailView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         return Expense.objects.select_related(
             "user", "expense_type__category", "cost_center", "approved_by"
-        ).prefetch_related("attachments", "approvals__approved_by", "payments", "comments__user")
+        ).prefetch_related(
+            "attachments", "approvals__approved_by", "payments", "comments__user"
+        )
 
 
 class ExpenseCreateView(LoginRequiredMixin, CreateView):
     model = Expense
     template_name = "django_expenses/expense_form.html"
     fields = [
-        "expense_type", "cost_center", "amount", "tax_amount",
-        "currency", "description", "vendor", "date_incurred",
+        "expense_type",
+        "cost_center",
+        "amount",
+        "tax_amount",
+        "currency",
+        "description",
+        "vendor",
+        "date_incurred",
     ]
     success_url = reverse_lazy("expenses:list")
 
@@ -58,8 +73,14 @@ class ExpenseUpdateView(LoginRequiredMixin, UpdateView):
     model = Expense
     template_name = "django_expenses/expense_form.html"
     fields = [
-        "expense_type", "cost_center", "amount", "tax_amount",
-        "currency", "description", "vendor", "date_incurred",
+        "expense_type",
+        "cost_center",
+        "amount",
+        "tax_amount",
+        "currency",
+        "description",
+        "vendor",
+        "date_incurred",
     ]
     success_url = reverse_lazy("expenses:list")
 

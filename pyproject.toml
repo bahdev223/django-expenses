@@ -40,12 +40,44 @@ dependencies = [
 drf = ["djangorestframework>=3.15"]
 filter = ["django-filter>=24.1"]
 api = ["django-expenses[drf,filter]"]
-dev = ["pytest>=8", "pytest-django>=4", "factory-boy>=3", "coverage>=7"]
+dev = [
+    "pytest>=8",
+    "pytest-django>=4",
+    "factory-boy>=3",
+    "coverage>=7",
+    "ruff>=0.5",
+    "pre-commit>=3",
+]
 
 [project.urls]
-Homepage = "https://github.com/solarplus/django-expenses"
+Homepage = "https://github.com/bahdev223/django-expenses"
 Documentation = "https://django-expenses.readthedocs.io/"
-Issues = "https://github.com/solarplus/django-expenses/issues"
+Issues = "https://github.com/bahdev223/django-expenses/issues"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["django_expenses*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+pythonpath = ["src"]
+testpaths = ["src/django_expenses/tests"]
+
+[tool.coverage.run]
+source = ["src/django_expenses"]
+omit = ["*/migrations/*", "*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __str__",
+    "def __repr__",
+]

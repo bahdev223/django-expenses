@@ -1,8 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from ....models import ExpenseCategory
-from ....constants import TEMPLATES as SOURCE_TEMPLATES
+from ...models import ExpenseCategory
+from ...constants import TEMPLATES as SOURCE_TEMPLATES
 
 
 class Command(BaseCommand):

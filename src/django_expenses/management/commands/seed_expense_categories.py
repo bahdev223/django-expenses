@@ -1,8 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from ....models import ExpenseCategory
-from ....constants import DEFAULT_EXPENSE_CATEGORIES
+from ...models import ExpenseCategory
+from ...constants import DEFAULT_EXPENSE_CATEGORIES
 
 
 class Command(BaseCommand):

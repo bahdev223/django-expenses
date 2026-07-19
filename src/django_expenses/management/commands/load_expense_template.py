@@ -1,17 +1,8 @@
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from ....models import ExpenseCategory
-from ....constants import DEFAULT_EXPENSE_CATEGORIES
-
-
-TEMPLATES = {
-    "default": {
-        "label": "Default categories",
-        "description": "Standard categories for any organization",
-        "categories": DEFAULT_EXPENSE_CATEGORIES,
-    },
-}
+from ....constants import TEMPLATES as SOURCE_TEMPLATES
 
 
 class Command(BaseCommand):
@@ -22,7 +13,7 @@ class Command(BaseCommand):
             "template",
             nargs="?",
             default="default",
-            choices=list(TEMPLATES.keys()) + ["list"],
+            choices=list(SOURCE_TEMPLATES.keys()) + ["list"],
             help="Template name to load",
         )
         parser.add_argument(
@@ -36,12 +27,12 @@ class Command(BaseCommand):
 
         if template_name == "list":
             self.stdout.write("Available templates:")
-            for name, tpl in TEMPLATES.items():
+            for name, tpl in SOURCE_TEMPLATES.items():
                 self.stdout.write(f"  {name}: {tpl['label']}")
                 self.stdout.write(f"    {tpl['description']}")
             return
 
-        template = TEMPLATES[template_name]
+        template = SOURCE_TEMPLATES[template_name]
 
         if options["force"]:
             deleted, _ = ExpenseCategory.objects.all().delete()
@@ -50,27 +41,44 @@ class Command(BaseCommand):
         created = 0
         parent_cache = {}
 
-        for code, name, parent_code, nature, account, sort in template["categories"]:
+        fields = [
+            "code", "name", "parent_code", "expense_nature",
+            "default_account_code", "default_vat_rate",
+            "requires_approval", "requires_receipt", "requires_vendor",
+            "unit", "icon", "sort_order", "depreciation_rate",
+        ]
+
+        for entry in template["categories"]:
+            data = dict(zip(fields, entry))
+            code = data["code"]
+
             if ExpenseCategory.objects.filter(code=code).exists():
                 self.stdout.write(f"  SKIP {code} (already exists)")
                 continue
 
             parent = None
-            if parent_code:
-                parent = parent_cache.get(parent_code)
+            if data["parent_code"]:
+                parent = parent_cache.get(data["parent_code"])
                 if not parent:
                     try:
-                        parent = ExpenseCategory.objects.get(code=parent_code)
+                        parent = ExpenseCategory.objects.get(code=data["parent_code"])
                     except ExpenseCategory.DoesNotExist:
                         continue
 
             cat = ExpenseCategory.objects.create(
                 code=code,
-                name=name,
+                name=data["name"],
                 parent=parent,
-                expense_nature=nature,
-                default_account_code=account,
-                sort_order=sort,
+                expense_nature=data["expense_nature"] or "",
+                default_account_code=data["default_account_code"] or "",
+                default_vat_rate=data["default_vat_rate"] or 0,
+                requires_approval=data["requires_approval"],
+                requires_receipt=data["requires_receipt"],
+                requires_vendor=data["requires_vendor"],
+                unit=data["unit"] or "",
+                icon=data["icon"] or "",
+                sort_order=data["sort_order"] or 0,
+                depreciation_rate=data["depreciation_rate"],
             )
             parent_cache[code] = cat
             created += 1

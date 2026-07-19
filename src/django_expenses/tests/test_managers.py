@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from ..models import Expense, ExpenseCategory
+from ..constants import ExpenseStatus
 
 User = get_user_model()
 
@@ -18,7 +19,7 @@ class ExpenseQuerySetTests(TestCase):
             amount=10000,
             description="Draft",
             date_incurred="2026-07-01",
-            status=Expense.Status.DRAFT,
+            status=ExpenseStatus.DRAFT,
         )
         Expense.objects.create(
             user=cls.user,
@@ -26,7 +27,7 @@ class ExpenseQuerySetTests(TestCase):
             amount=20000,
             description="Paid",
             date_incurred="2026-07-02",
-            status=Expense.Status.PAID,
+            status=ExpenseStatus.PAID,
         )
         Expense.objects.create(
             user=cls.user,
@@ -34,7 +35,7 @@ class ExpenseQuerySetTests(TestCase):
             amount=30000,
             description="Approved",
             date_incurred="2026-07-03",
-            status=Expense.Status.APPROVED,
+            status=ExpenseStatus.APPROVED,
         )
 
     def test_by_status(self):

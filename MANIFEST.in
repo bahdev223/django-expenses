@@ -4,3 +4,4 @@ include CHANGELOG.md
 recursive-include src/django_expenses/templates *
 recursive-include src/django_expenses/static *
 recursive-include src/django_expenses/migrations *
+recursive-include src/django_expenses/data *

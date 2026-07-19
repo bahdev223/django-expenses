@@ -158,8 +158,9 @@ class ExpenseWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Expense
         fields = [
-            "category", "expense_nature", "cost_center",
+            "id", "category", "expense_nature", "cost_center",
             "amount", "tax_amount", "currency",
             "description", "vendor", "date_incurred",
             "payment_method",
         ]
+        read_only_fields = ["id"]

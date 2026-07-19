@@ -5,7 +5,7 @@ from ..constants import ExpenseNature
 
 
 class ExpenseCategory(models.Model):
-    code = models.CharField(max_length=50, unique=True)
+    code = models.CharField(max_length=50, unique=True, db_index=True)
     name = models.CharField(max_length=200)
     parent = models.ForeignKey(
         "self",
@@ -19,25 +19,44 @@ class ExpenseCategory(models.Model):
         max_length=20,
         choices=ExpenseNature.CHOICES,
         blank=True,
-        help_text=_("Nature of expense: operating, investment, mission, purchase..."),
+        help_text=_("Type of expense: ACHAT, FONCTIONNEMENT, PERSONNEL..."),
     )
     default_account_code = models.CharField(
         max_length=20,
         blank=True,
-        help_text=_("Default OHADA account code (e.g. 6251 for fuel)"),
+        help_text=_("OHADA account code (e.g. 6251 for fuel)"),
     )
     default_vat_rate = models.DecimalField(
-        max_digits=5, decimal_places=2, default=0
+        max_digits=5, decimal_places=2, default=0,
+        help_text=_("Default VAT rate percentage (e.g. 18.00)"),
+    )
+    requires_approval = models.BooleanField(
+        default=True,
+        help_text=_("Whether this expense type requires approval"),
+    )
+    requires_receipt = models.BooleanField(
+        default=True,
+        help_text=_("Whether a receipt/justificatif is required"),
+    )
+    requires_vendor = models.BooleanField(
+        default=True,
+        help_text=_("Whether a vendor/tiers is required"),
+    )
+    unit = models.CharField(
+        max_length=50, blank=True,
+        help_text=_("Default unit of measure (kg, litre, pièce...)"),
+    )
+    depreciation_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, blank=True, null=True,
+        help_text=_("Annual depreciation rate percentage (for fixed assets)"),
     )
     color = models.CharField(
-        max_length=7,
-        blank=True,
+        max_length=7, blank=True,
         help_text=_("Hex color for UI (e.g. #FF5733)"),
     )
     icon = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text=_("Icon name for UI"),
+        max_length=50, blank=True,
+        help_text=_("Font Awesome icon class (e.g. fa-gas-pump)"),
     )
     sort_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -51,7 +70,7 @@ class ExpenseCategory(models.Model):
 
     def __str__(self):
         if self.parent:
-            return f"{self.parent.name} › {self.name}"
+            return f"{self.parent.name} \u203a {self.name}"
         return self.name
 
     def get_ancestors(self):
@@ -89,3 +108,7 @@ class ExpenseCategory(models.Model):
             d += 1
             node = node.parent
         return d
+
+    @property
+    def nature_label(self):
+        return dict(ExpenseNature.CHOICES).get(self.expense_nature, "")

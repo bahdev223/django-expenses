@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from django.views.generic import (
     ListView,
     DetailView,
@@ -10,6 +10,7 @@ from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 
 from .models import Expense
+from .constants import ExpenseStatus
 from .services import ExpenseService
 
 
@@ -32,7 +33,7 @@ class ExpenseListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["status_choices"] = Expense.Status.choices
+        ctx["status_choices"] = ExpenseStatus.CHOICES
         ctx["current_status"] = self.request.GET.get("status", "")
         return ctx
 
@@ -102,4 +103,5 @@ urlpatterns = [
     path("create/", ExpenseCreateView.as_view(), name="create"),
     path("<int:pk>/update/", ExpenseUpdateView.as_view(), name="update"),
     path("<int:pk>/delete/", ExpenseDeleteView.as_view(), name="delete"),
+    path("api/", include("django_expenses.api.urls", namespace="expenses_api")),
 ]

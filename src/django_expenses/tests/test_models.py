@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from ..models import ExpenseCategory, CostCenter, Expense
+from ..constants import ExpenseStatus
 
 User = get_user_model()
 
@@ -29,7 +30,7 @@ class ExpenseModelTests(TestCase):
             vendor="Station Total",
             date_incurred="2026-07-01",
         )
-        self.assertEqual(expense.status, Expense.Status.DRAFT)
+        self.assertEqual(expense.status, ExpenseStatus.DRAFT)
         self.assertEqual(expense.total_amount, 50000)
         self.assertTrue(expense.is_editable)
         self.assertEqual(expense.suggested_account_code, "6251")
@@ -62,7 +63,7 @@ class ExpenseModelTests(TestCase):
             amount=50000,
             description="Test",
             date_incurred="2026-07-01",
-            status=Expense.Status.SUBMITTED,
+            status=ExpenseStatus.SUBMITTED,
         )
         self.assertFalse(expense.is_editable)
 

@@ -15,13 +15,19 @@ from .signals import (
 
 @receiver(pre_save, sender=Expense, dispatch_uid="expense_auto_reference")
 def expense_auto_reference(sender, instance, **kwargs):
-    if not instance.reference_number and instance.pk:
-        instance.reference_number = generate_reference(instance)
+    if not instance.reference_number:
+        if instance.pk:
+            instance.reference_number = generate_reference(instance)
+        else:
+            instance.reference_number = f"TMP-{id(instance):x}"
 
 
 @receiver(post_save, sender=Expense, dispatch_uid="expense_emit_signals")
 def expense_emit_signals(sender, instance, created, **kwargs):
     if created:
+        if instance.reference_number and instance.reference_number.startswith("TMP-"):
+            instance.reference_number = generate_reference(instance)
+            Expense.objects.filter(pk=instance.pk).update(reference_number=instance.reference_number)
         expense_created.send(sender=Expense, expense=instance, user=instance.user)
     else:
         expense_updated.send(sender=Expense, expense=instance, user=instance.user)

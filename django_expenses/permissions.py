@@ -1,0 +1,6 @@
+PERM_ADD_EXPENSE = "expenses.add_expense"
+PERM_CHANGE_EXPENSE = "expenses.change_expense"
+PERM_DELETE_EXPENSE = "expenses.delete_expense"
+PERM_APPROVE_EXPENSE = "expenses.approve_expense"
+PERM_PAY_EXPENSE = "expenses.pay_expense"
+PERM_VIEW_REPORTS = "expenses.view_expense_reports"

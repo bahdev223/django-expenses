@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dépenses - django-expenses</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">Dépenses</h1>
+            <a href="{% url 'expenses:create' %}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                + Nouvelle dépense
+            </a>
+        </div>
+
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="p-4 border-b flex space-x-2">
+                <a href="{% url 'expenses:list' %}" class="px-3 py-1 rounded {% if not current_status %}bg-blue-600 text-white{% else %}bg-gray-200{% endif %}">
+                    Toutes
+                </a>
+                {% for code, label in status_choices %}
+                <a href="{% url 'expenses:list' %}?status={{ code }}"
+                   class="px-3 py-1 rounded {% if current_status == code %}bg-blue-600 text-white{% else %}bg-gray-200{% endif %}">
+                    {{ label }}
+                </a>
+                {% endfor %}
+            </div>
+
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Réf.</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Montant</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Centre coût</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fournisseur</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for expense in expense_list %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm font-mono">{{ expense.reference_number|default:"-" }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if expense.status == 'draft' %}bg-gray-100 text-gray-600
+                                {% elif expense.status == 'submitted' %}bg-blue-100 text-blue-600
+                                {% elif expense.status == 'pending_approval' %}bg-yellow-100 text-yellow-600
+                                {% elif expense.status == 'approved' %}bg-green-100 text-green-600
+                                {% elif expense.status == 'rejected' %}bg-red-100 text-red-600
+                                {% elif expense.status == 'paid' %}bg-teal-100 text-teal-600
+                                {% elif expense.status == 'archived' %}bg-gray-100 text-gray-400
+                                {% elif expense.status == 'cancelled' %}bg-red-50 text-red-300
+                                {% endif %}">
+                                {{ expense.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm font-medium">{{ expense.total_amount|floatformat:0 }} {{ expense.currency }}</td>
+                        <td class="px-4 py-3 text-sm">{{ expense.expense_type.name|default:"-" }}</td>
+                        <td class="px-4 py-3 text-sm">{{ expense.cost_center.name|default:"-" }}</td>
+                        <td class="px-4 py-3 text-sm">{{ expense.vendor|default:"-"|truncatechars:20 }}</td>
+                        <td class="px-4 py-3 text-sm">{{ expense.date_incurred|date:"d/m/Y" }}</td>
+                        <td class="px-4 py-3 text-sm text-right">
+                            <a href="{% url 'expenses:detail' expense.pk %}" class="text-blue-600 hover:underline">Détail</a>
+                            {% if expense.is_editable %}
+                            <a href="{% url 'expenses:update' expense.pk %}" class="text-orange-600 hover:underline ml-2">Modifier</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                            Aucune dépense trouvée.
+                            <a href="{% url 'expenses:create' %}" class="text-blue-600 hover:underline block mt-2">Créer la première dépense</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

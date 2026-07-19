@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
-from ..models import ExpenseCategory, ExpenseType
+from ..models import ExpenseCategory
 
 User = get_user_model()
 
@@ -13,9 +13,8 @@ class ExpenseAPITests(TestCase):
         cls.admin = User.objects.create_superuser(
             "admin", "admin@test.com", "testpass"
         )
-        cls.category = ExpenseCategory.objects.create(name="Transport")
-        cls.expense_type = ExpenseType.objects.create(
-            name="Carburant", category=cls.category
+        cls.category = ExpenseCategory.objects.create(
+            code="FUEL", name="Carburant"
         )
 
     def setUp(self):
@@ -30,7 +29,7 @@ class ExpenseAPITests(TestCase):
         response = self.client.post(
             "/api/expenses/",
             {
-                "expense_type": self.expense_type.id,
+                "category": self.category.id,
                 "amount": 50000,
                 "description": "Test API",
                 "date_incurred": "2026-07-01",
@@ -44,7 +43,7 @@ class ExpenseAPITests(TestCase):
         resp = self.client.post(
             "/api/expenses/",
             {
-                "expense_type": self.expense_type.id,
+                "category": self.category.id,
                 "amount": 50000,
                 "description": "Test submit",
                 "date_incurred": "2026-07-01",

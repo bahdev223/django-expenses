@@ -11,11 +11,13 @@ def on_expense_approved(sender, expense, user, **kwargs):
     """When an expense is approved, create an accounting entry."""
     from comptabilite_ohada.services.ecriture_service import EcritureService
     svc = EcritureService()
+    # Use the category's default account code, fallback to 658
+    charge_code = expense.suggested_account_code or "658"
     svc.creer_ecriture_charge(
         compte_caisse_code="571",
         montant=float(expense.total_amount),
         libelle=f"Depense approuvee: {expense.reference_number} - {expense.description[:50]}",
-        compte_charge_code="658",
+        compte_charge_code=charge_code,
         user=user,
     )
 

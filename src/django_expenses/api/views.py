@@ -6,7 +6,6 @@ from rest_framework.permissions import DjangoModelPermissions
 from ..models import (
     Expense,
     ExpenseCategory,
-    ExpenseType,
     CostCenter,
     ExpenseAttachment,
     ExpenseApproval,
@@ -20,7 +19,7 @@ from .serializers import (
     ExpenseDetailSerializer,
     ExpenseWriteSerializer,
     ExpenseCategorySerializer,
-    ExpenseTypeSerializer,
+    ExpenseCategoryTreeSerializer,
     CostCenterSerializer,
     ExpenseAttachmentSerializer,
     ExpenseApprovalSerializer,
@@ -31,10 +30,12 @@ from .serializers import (
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     queryset = Expense.objects.select_related(
-        "user", "expense_type__category", "cost_center", "approved_by"
+        "user", "category", "cost_center", "approved_by"
     ).prefetch_related("attachments", "approvals", "payments", "comments")
     permission_classes = [DjangoModelPermissions]
-    filterset_fields = ["status", "expense_type", "cost_center", "currency", "user"]
+    filterset_fields = [
+        "status", "category", "expense_nature", "cost_center", "currency", "user",
+    ]
     search_fields = ["reference_number", "description", "vendor"]
 
     def get_serializer_class(self):
@@ -100,10 +101,11 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def report(self, request):
-        from datetime import date
-        start = request.query_params.get("start", str(date.today().replace(day=1)))
+        from datetime import date, datetime
+        start = request.query_params.get(
+            "start", str(date.today().replace(day=1))
+        )
         end = request.query_params.get("end", str(date.today()))
-        from datetime import datetime
         start_date = datetime.strptime(start, "%Y-%m-%d").date()
         end_date = datetime.strptime(end, "%Y-%m-%d").date()
         report = ReportService.generate_report(start_date, end_date)
@@ -117,16 +119,20 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
 class ExpenseCategoryViewSet(viewsets.ModelViewSet):
     queryset = ExpenseCategory.objects.all()
-    serializer_class = ExpenseCategorySerializer
     permission_classes = [DjangoModelPermissions]
+    filterset_fields = ["expense_nature", "is_active"]
+    search_fields = ["code", "name", "default_account_code"]
 
+    def get_serializer_class(self):
+        if self.request.query_params.get("tree"):
+            return ExpenseCategoryTreeSerializer
+        return ExpenseCategorySerializer
 
-class ExpenseTypeViewSet(viewsets.ModelViewSet):
-    queryset = ExpenseType.objects.select_related("category").all()
-    serializer_class = ExpenseTypeSerializer
-    permission_classes = [DjangoModelPermissions]
-    filterset_fields = ["category", "is_active"]
-    search_fields = ["name"]
+    def get_queryset(self):
+        qs = ExpenseCategory.objects.select_related("parent")
+        if self.request.query_params.get("roots"):
+            qs = qs.filter(parent__isnull=True)
+        return qs
 
 
 class CostCenterViewSet(viewsets.ModelViewSet):

@@ -45,11 +45,15 @@
                 </div>
                 <div>
                     <dt class="text-gray-500">Catégorie</dt>
-                    <dd class="font-medium">{{ expense.expense_type.category.name|default:"-" }}</dd>
+                    <dd class="font-medium">{{ expense.category.get_full_path|default:"-" }}</dd>
                 </div>
                 <div>
-                    <dt class="text-gray-500">Type</dt>
-                    <dd class="font-medium">{{ expense.expense_type.name|default:"-" }}</dd>
+                    <dt class="text-gray-500">Nature</dt>
+                    <dd class="font-medium">{{ expense.get_expense_nature_display|default:"-" }}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Compte suggéré</dt>
+                    <dd class="font-medium font-mono text-blue-600">{{ expense.suggested_account_code|default:"-" }}</dd>
                 </div>
                 <div>
                     <dt class="text-gray-500">Centre de coût</dt>

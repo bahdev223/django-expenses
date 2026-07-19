@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from ..models import Expense, ExpenseCategory, ExpenseType, ExpensePayment
+from ..models import Expense, ExpenseCategory
 from ..services import ExpenseService
 from ..exceptions import WorkflowError
 
@@ -11,20 +11,19 @@ class ExpenseServiceTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user("testuser", password="testpass")
-        cls.approver = User.objects.create_user("approver", password="testpass")
         cls.admin = User.objects.create_superuser(
             "admin", "admin@test.com", "testpass"
         )
-        cls.category = ExpenseCategory.objects.create(name="Transport")
-        cls.expense_type = ExpenseType.objects.create(
-            name="Carburant", category=cls.category
+        cls.category = ExpenseCategory.objects.create(
+            code="FUEL", name="Carburant",
+            default_account_code="6251",
         )
 
     def test_create_expense(self):
         expense = ExpenseService.create(
             {
                 "user": self.user,
-                "expense_type": self.expense_type,
+                "category": self.category,
                 "amount": 50000,
                 "description": "Test",
                 "date_incurred": "2026-07-01",
@@ -33,12 +32,13 @@ class ExpenseServiceTests(TestCase):
         )
         self.assertEqual(expense.status, Expense.Status.DRAFT)
         self.assertEqual(expense.amount, 50000)
+        self.assertEqual(expense.suggested_account_code, "6251")
 
     def test_submit_expense(self):
         expense = ExpenseService.create(
             {
                 "user": self.user,
-                "expense_type": self.expense_type,
+                "category": self.category,
                 "amount": 50000,
                 "description": "Test",
                 "date_incurred": "2026-07-01",
@@ -52,7 +52,7 @@ class ExpenseServiceTests(TestCase):
         expense = ExpenseService.create(
             {
                 "user": self.user,
-                "expense_type": self.expense_type,
+                "category": self.category,
                 "amount": 50000,
                 "description": "Test",
                 "date_incurred": "2026-07-01",
@@ -69,7 +69,7 @@ class ExpenseServiceTests(TestCase):
         expense = ExpenseService.create(
             {
                 "user": self.user,
-                "expense_type": self.expense_type,
+                "category": self.category,
                 "amount": 50000,
                 "description": "Test",
                 "date_incurred": "2026-07-01",
@@ -89,7 +89,7 @@ class ExpenseServiceTests(TestCase):
         expense = ExpenseService.create(
             {
                 "user": self.user,
-                "expense_type": self.expense_type,
+                "category": self.category,
                 "amount": 50000,
                 "description": "Test",
                 "date_incurred": "2026-07-01",
@@ -110,7 +110,7 @@ class ExpenseServiceTests(TestCase):
         expense = ExpenseService.create(
             {
                 "user": self.user,
-                "expense_type": self.expense_type,
+                "category": self.category,
                 "amount": 50000,
                 "description": "Test",
                 "date_incurred": "2026-07-01",
@@ -124,7 +124,7 @@ class ExpenseServiceTests(TestCase):
         expense = ExpenseService.create(
             {
                 "user": self.user,
-                "expense_type": self.expense_type,
+                "category": self.category,
                 "amount": 50000,
                 "description": "Test",
                 "date_incurred": "2026-07-01",

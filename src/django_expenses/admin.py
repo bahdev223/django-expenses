@@ -4,7 +4,6 @@ from django.utils.html import format_html
 from .models import (
     Expense,
     ExpenseCategory,
-    ExpenseType,
     CostCenter,
     ExpenseAttachment,
     ExpenseApproval,
@@ -47,21 +46,22 @@ class ExpenseAdmin(admin.ModelAdmin):
         "reference_number",
         "colored_status",
         "user",
-        "expense_type",
+        "category_path",
+        "expense_nature",
         "cost_center",
         "amount_display",
-        "total_display",
         "date_incurred",
     ]
     list_filter = [
         "status",
-        "expense_type__category",
+        "expense_nature",
+        "category",
         "cost_center",
         "currency",
         "date_incurred",
     ]
     search_fields = ["reference_number", "description", "vendor", "user__username"]
-    list_select_related = ["user", "expense_type__category", "cost_center"]
+    list_select_related = ["user", "category", "cost_center"]
     date_hierarchy = "date_incurred"
     readonly_fields = [
         "reference_number",
@@ -72,25 +72,37 @@ class ExpenseAdmin(admin.ModelAdmin):
         "approved_by",
         "created_at",
         "updated_at",
+        "suggested_account_code",
     ]
     fieldsets = [
         ("Identification", {
-            "fields": ["reference_number", "status", "user", "expense_type", "cost_center"]
+            "fields": [
+                "reference_number", "status", "user", "category",
+                "expense_nature", "cost_center",
+            ]
         }),
         ("Montants", {"fields": ["amount", "tax_amount", "currency"]}),
         ("Détails", {"fields": ["description", "vendor", "date_incurred"]}),
+        ("Comptabilité", {"fields": ["suggested_account_code"]}),
         ("Paiement", {
             "fields": ["payment_method", "approved_by", "rejection_reason"]
         }),
         ("Dates", {
             "fields": [
                 "date_submitted", "date_approved", "date_paid",
-                "created_at", "updated_at"
+                "created_at", "updated_at",
             ]
         }),
     ]
     inlines = [ApprovalInline, PaymentInline, AttachmentInline, CommentInline]
     actions = ["export_csv", "mark_paid", "mark_archived"]
+
+    def category_path(self, obj):
+        if obj.category:
+            return obj.category.get_full_path()
+        return "-"
+    category_path.short_description = "Catégorie"
+    category_path.admin_order_field = "category__name"
 
     def colored_status(self, obj):
         colors = {
@@ -115,10 +127,6 @@ class ExpenseAdmin(admin.ModelAdmin):
         return f"{obj.amount:,.2f}"
     amount_display.short_description = "Montant"
 
-    def total_display(self, obj):
-        return f"{obj.total_amount:,.2f}"
-    total_display.short_description = "Total TTC"
-
     def export_csv(self, request, queryset):
         return ExpenseService.export_csv(queryset)
     export_csv.short_description = "Export CSV sélection"
@@ -142,24 +150,23 @@ class ExpenseAdmin(admin.ModelAdmin):
 
 @admin.register(ExpenseCategory)
 class ExpenseCategoryAdmin(admin.ModelAdmin):
-    list_display = ["name", "sort_order", "is_active", "expense_count"]
-    list_filter = ["is_active"]
-    search_fields = ["name"]
-    list_editable = ["sort_order", "is_active"]
-
-    def expense_count(self, obj):
-        return Expense.objects.filter(expense_type__category=obj).count()
-    expense_count.short_description = "Dépenses"
-
-
-@admin.register(ExpenseType)
-class ExpenseTypeAdmin(admin.ModelAdmin):
     list_display = [
-        "name", "category", "requires_approval", "max_amount", "is_active"
+        "code", "name", "indented_name", "parent", "expense_nature",
+        "default_account_code", "is_active", "sort_order",
     ]
-    list_filter = ["category", "requires_approval", "is_active"]
-    search_fields = ["name"]
-    autocomplete_fields = ["category"]
+    list_filter = ["expense_nature", "is_active"]
+    search_fields = ["code", "name", "default_account_code"]
+    list_editable = ["sort_order", "is_active"]
+    list_select_related = ["parent"]
+    prepopulated_fields = {"code": ("name",)}
+
+    def indented_name(self, obj):
+        indent = "&nbsp;&nbsp;&nbsp;" * obj.depth
+        color = f' style="color:{obj.color}"' if obj.color else ""
+        icon = f"{obj.icon} " if obj.icon else ""
+        return format_html(f'{indent}<span{color}>{icon}{obj.name}</span>')
+    indented_name.short_description = "Nom"
+    indented_name.allow_tags = True
 
 
 @admin.register(CostCenter)
@@ -184,7 +191,9 @@ class ExpenseApprovalAdmin(admin.ModelAdmin):
 
 @admin.register(ExpensePayment)
 class ExpensePaymentAdmin(admin.ModelAdmin):
-    list_display = ["expense", "amount_paid", "payment_date", "payment_method", "paid_by"]
+    list_display = [
+        "expense", "amount_paid", "payment_date", "payment_method", "paid_by"
+    ]
     list_filter = ["payment_method", "payment_date"]
     search_fields = ["reference", "expense__reference_number"]
 

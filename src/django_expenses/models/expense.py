@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from ..constants import ExpenseStatus, PaymentMethod
+from ..constants import ExpenseStatus, ExpenseNature, PaymentMethod
 from ..managers import ExpenseQuerySet
 
 
@@ -12,10 +12,17 @@ class Expense(models.Model):
         on_delete=models.CASCADE,
         related_name="expenses",
     )
-    expense_type = models.ForeignKey(
-        "ExpenseType",
+    category = models.ForeignKey(
+        "ExpenseCategory",
         on_delete=models.PROTECT,
         related_name="expenses",
+        help_text=_("Hierarchical expense category with default account code"),
+    )
+    expense_nature = models.CharField(
+        max_length=20,
+        choices=ExpenseNature.CHOICES,
+        blank=True,
+        help_text=_("Nature: operating, investment, mission, purchase..."),
     )
     cost_center = models.ForeignKey(
         "CostCenter",
@@ -78,3 +85,9 @@ class Expense(models.Model):
     @property
     def is_editable(self):
         return self.status in ExpenseStatus.EDITABLE
+
+    @property
+    def suggested_account_code(self):
+        if self.category and self.category.default_account_code:
+            return self.category.default_account_code
+        return ""

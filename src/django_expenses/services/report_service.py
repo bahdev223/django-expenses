@@ -33,21 +33,22 @@ class ReportService:
         writer = csv.writer(response)
         writer.writerow([
             "Reference", "Date", "Amount", "Currency", "Status",
-            "Category", "Type", "Cost Center", "Vendor", "Description",
+            "Category", "Category Path", "Nature", "Cost Center",
+            "Vendor", "Description", "Account Code",
         ])
-        for e in queryset.select_related(
-            "expense_type__category", "cost_center"
-        ):
+        for e in queryset.select_related("category", "cost_center"):
             writer.writerow([
                 e.reference_number,
                 e.date_incurred,
                 e.total_amount,
                 e.currency,
                 e.get_status_display(),
-                e.expense_type.category.name if e.expense_type else "",
-                e.expense_type.name if e.expense_type else "",
+                e.category.name if e.category else "",
+                e.category.get_full_path() if e.category else "",
+                e.get_expense_nature_display() if e.expense_nature else "",
                 e.cost_center.name if e.cost_center else "",
                 e.vendor,
                 e.description[:100],
+                e.suggested_account_code,
             ])
         return response

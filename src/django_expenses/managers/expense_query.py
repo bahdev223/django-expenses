@@ -42,7 +42,14 @@ class ExpenseQuerySet(models.QuerySet):
 
     def total_by_category(self):
         return (
-            self.values("expense_type__category__name")
+            self.values("category__name", "category__code")
+            .annotate(total=Sum(F("amount") + F("tax_amount")))
+            .order_by("-total")
+        )
+
+    def total_by_parent_category(self):
+        return (
+            self.values("category__parent__name", "category__parent__code")
             .annotate(total=Sum(F("amount") + F("tax_amount")))
             .order_by("-total")
         )

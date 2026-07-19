@@ -23,7 +23,7 @@ class ExpenseListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         qs = Expense.objects.select_related(
-            "user", "expense_type__category", "cost_center"
+            "user", "category", "cost_center"
         )
         status = self.request.GET.get("status")
         if status:
@@ -43,9 +43,12 @@ class ExpenseDetailView(LoginRequiredMixin, DetailView):
 
     def get_queryset(self):
         return Expense.objects.select_related(
-            "user", "expense_type__category", "cost_center", "approved_by"
+            "user", "category", "cost_center", "approved_by"
         ).prefetch_related(
-            "attachments", "approvals__approved_by", "payments", "comments__user"
+            "attachments",
+            "approvals__approved_by",
+            "payments",
+            "comments__user",
         )
 
 
@@ -53,7 +56,8 @@ class ExpenseCreateView(LoginRequiredMixin, CreateView):
     model = Expense
     template_name = "django_expenses/expense_form.html"
     fields = [
-        "expense_type",
+        "category",
+        "expense_nature",
         "cost_center",
         "amount",
         "tax_amount",
@@ -73,7 +77,8 @@ class ExpenseUpdateView(LoginRequiredMixin, UpdateView):
     model = Expense
     template_name = "django_expenses/expense_form.html"
     fields = [
-        "expense_type",
+        "category",
+        "expense_nature",
         "cost_center",
         "amount",
         "tax_amount",

@@ -34,7 +34,8 @@
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Réf.</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Montant</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Catégorie</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nature</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Centre coût</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fournisseur</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
@@ -60,7 +61,8 @@
                             </span>
                         </td>
                         <td class="px-4 py-3 text-sm font-medium">{{ expense.total_amount|floatformat:0 }} {{ expense.currency }}</td>
-                        <td class="px-4 py-3 text-sm">{{ expense.expense_type.name|default:"-" }}</td>
+                        <td class="px-4 py-3 text-sm">{{ expense.category.get_full_path|default:"-" }}</td>
+                        <td class="px-4 py-3 text-sm">{{ expense.get_expense_nature_display|default:"-" }}</td>
                         <td class="px-4 py-3 text-sm">{{ expense.cost_center.name|default:"-" }}</td>
                         <td class="px-4 py-3 text-sm">{{ expense.vendor|default:"-"|truncatechars:20 }}</td>
                         <td class="px-4 py-3 text-sm">{{ expense.date_incurred|date:"d/m/Y" }}</td>
@@ -73,7 +75,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                        <td colspan="9" class="px-6 py-12 text-center text-gray-500">
                             Aucune dépense trouvée.
                             <a href="{% url 'expenses:create' %}" class="text-blue-600 hover:underline block mt-2">Créer la première dépense</a>
                         </td>

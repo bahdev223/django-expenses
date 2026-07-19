@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from ..models import Expense, ExpenseCategory, ExpenseType
+from ..models import Expense, ExpenseCategory
 
 User = get_user_model()
 
@@ -9,13 +9,12 @@ class ExpenseQuerySetTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user("testuser", password="testpass")
-        cls.category = ExpenseCategory.objects.create(name="Transport")
-        cls.expense_type = ExpenseType.objects.create(
-            name="Carburant", category=cls.category
+        cls.category = ExpenseCategory.objects.create(
+            code="FUEL", name="Carburant"
         )
         Expense.objects.create(
             user=cls.user,
-            expense_type=cls.expense_type,
+            category=cls.category,
             amount=10000,
             description="Draft",
             date_incurred="2026-07-01",
@@ -23,7 +22,7 @@ class ExpenseQuerySetTests(TestCase):
         )
         Expense.objects.create(
             user=cls.user,
-            expense_type=cls.expense_type,
+            category=cls.category,
             amount=20000,
             description="Paid",
             date_incurred="2026-07-02",
@@ -31,7 +30,7 @@ class ExpenseQuerySetTests(TestCase):
         )
         Expense.objects.create(
             user=cls.user,
-            expense_type=cls.expense_type,
+            category=cls.category,
             amount=30000,
             description="Approved",
             date_incurred="2026-07-03",

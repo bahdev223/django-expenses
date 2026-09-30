@@ -10,12 +10,12 @@ class ExpenseApproval(models.Model):
 
     expense = models.ForeignKey(
         "Expense",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="approvals",
     )
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="expense_approvals",
     )
     decision = models.CharField(max_length=10, choices=Decision.choices)
@@ -29,3 +29,7 @@ class ExpenseApproval(models.Model):
 
     def __str__(self):
         return f"{self.expense} - {self.get_decision_display()}"
+
+    depense = property(lambda self: self.expense)
+    approuve_par = property(lambda self: self.approved_by)
+    decision_metier = property(lambda self: self.decision)

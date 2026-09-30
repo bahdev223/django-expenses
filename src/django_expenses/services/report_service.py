@@ -1,24 +1,24 @@
-from django.http import HttpResponse
 import csv
 
+from django.http import HttpResponse
+
+from ..constants import ExpenseStatus
 from ..models import Expense
 
 
 class ReportService:
     @staticmethod
     def generate_report(start_date, end_date, cost_center=None):
-        qs = Expense.objects.filter(
-            date_incurred__gte=start_date, date_incurred__lte=end_date
-        )
+        qs = Expense.objects.filter(supprime_le__isnull=True).by_period(start_date, end_date)
         if cost_center:
-            qs = qs.filter(cost_center=cost_center)
+            qs = qs.filter(cost_center_id=cost_center)
         return {
             "total_expenses": qs.total_amount(),
             "count": qs.count(),
             "by_category": list(qs.total_by_category()),
             "by_status": {
                 label: qs.filter(status=code).count()
-                for code, label in Expense.Status.choices
+                for code, label in ExpenseStatus.CHOICES
             },
             "by_cost_center": list(qs.total_by_cost_center()),
             "monthly": list(qs.monthly_summary()),
@@ -32,15 +32,19 @@ class ReportService:
         response["Content-Disposition"] = "attachment; filename=expenses.csv"
         writer = csv.writer(response)
         writer.writerow([
-            "Reference", "Date", "Amount", "Currency", "Status",
-            "Category", "Category Path", "Nature", "Cost Center",
-            "Vendor", "Description", "Account Code",
+            "Reference", "Date", "Amount", "Tax", "Total", "Paid", "Remaining",
+            "Currency", "Status", "Category", "Category Path", "Nature",
+            "Cost Center", "Vendor", "Description", "Account Code",
         ])
-        for e in queryset.select_related("category", "cost_center"):
+        for e in queryset.select_related("category", "cost_center").prefetch_related("payments"):
             writer.writerow([
                 e.reference_number,
                 e.date_incurred,
+                e.amount,
+                e.tax_amount,
                 e.total_amount,
+                e.paid_amount,
+                e.remaining_amount,
                 e.currency,
                 e.get_status_display(),
                 e.category.name if e.category else "",

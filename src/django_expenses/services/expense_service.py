@@ -54,6 +54,14 @@ class ExpenseService:
             raise ValidationError({"amount": "Le montant doit être supérieur à zéro."})
         if tax_amount is not None and Decimal(str(tax_amount)) < 0:
             raise ValidationError({"tax_amount": "Le montant de taxe ne peut pas être négatif."})
+        projet_source = data.get("projet_source", getattr(instance, "projet_source", ""))
+        projet_reference = data.get("projet_reference", getattr(instance, "projet_reference", ""))
+        if bool(projet_source) != bool(projet_reference):
+            raise ValidationError({
+                "projet_reference": (
+                    "projet_source et projet_reference doivent être renseignés ensemble."
+                )
+            })
 
     @staticmethod
     def _validate_submission(expense):

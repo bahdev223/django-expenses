@@ -26,6 +26,22 @@ class BudgetDepense(models.Model):
         blank=True,
         related_name="budgets_depenses",
     )
+    projet_source = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text=_("Application/source owning the project"),
+    )
+    projet_reference = models.CharField(
+        max_length=120,
+        blank=True,
+        db_index=True,
+        help_text=_("Stable external project reference"),
+    )
+    projet_libelle = models.CharField(
+        max_length=240,
+        blank=True,
+        help_text=_("Project label snapshot for display"),
+    )
     bloquant = models.BooleanField(default=True)
     actif = models.BooleanField(default=True)
     cree_le = models.DateTimeField(auto_now_add=True)
@@ -38,6 +54,13 @@ class BudgetDepense(models.Model):
         constraints = [
             models.CheckConstraint(check=Q(montant_alloue__gte=0), name="budget_depense_montant_gte_zero"),
             models.CheckConstraint(check=Q(date_fin__gte=F("date_debut")), name="budget_depense_dates_valides"),
+            models.CheckConstraint(
+                check=(
+                    Q(projet_source="", projet_reference="")
+                    | (~Q(projet_source="") & ~Q(projet_reference=""))
+                ),
+                name="budget_depense_projet_coherent",
+            ),
         ]
 
     def __str__(self):
@@ -58,7 +81,26 @@ class BudgetDepense(models.Model):
             qs = qs.filter(category_id=self.categorie_id)
         if self.centre_cout_id:
             qs = qs.filter(cost_center_id=self.centre_cout_id)
+        if self.projet_reference:
+            qs = qs.filter(
+                projet_source=self.projet_source,
+                projet_reference=self.projet_reference,
+            )
         return qs
+
+    @property
+    def est_budget_projet(self):
+        return bool(self.projet_reference)
+
+    @property
+    def projet(self):
+        if not self.projet_reference:
+            return None
+        return {
+            "source": self.projet_source,
+            "reference": self.projet_reference,
+            "libelle": self.projet_libelle,
+        }
 
     @property
     def montant_consomme(self):

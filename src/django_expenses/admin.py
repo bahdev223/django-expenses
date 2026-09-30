@@ -62,10 +62,16 @@ class EventInline(admin.TabularInline):
 class ExpenseAdmin(admin.ModelAdmin):
     list_display = [
         "reference_number", "colored_status", "user", "category_path", "expense_nature",
-        "cost_center", "amount_display", "paid_display", "remaining_display", "date_incurred",
+        "cost_center", "projet_reference", "amount_display", "paid_display", "remaining_display", "date_incurred",
     ]
-    list_filter = ["status", "expense_nature", "category", "cost_center", "currency", "date_incurred"]
-    search_fields = ["reference_number", "description", "vendor", "user__username"]
+    list_filter = [
+        "status", "expense_nature", "category", "cost_center", "currency",
+        "projet_source", "date_incurred",
+    ]
+    search_fields = [
+        "reference_number", "description", "vendor", "user__username",
+        "projet_reference", "projet_libelle",
+    ]
     list_select_related = ["user", "category", "cost_center"]
     date_hierarchy = "date_incurred"
     readonly_fields = [
@@ -75,6 +81,7 @@ class ExpenseAdmin(admin.ModelAdmin):
     ]
     fieldsets = [
         ("Identification", {"fields": ["reference_number", "status", "user", "category", "expense_nature", "cost_center"]}),
+        ("Projet", {"fields": ["projet_source", "projet_reference", "projet_libelle"]}),
         ("Montants", {"fields": ["amount", "tax_amount", "currency", "paid_amount", "remaining_amount"]}),
         ("Détails", {"fields": ["description", "vendor", "date_incurred"]}),
         ("Comptabilité", {"fields": ["suggested_account_code"]}),
@@ -89,6 +96,9 @@ class ExpenseAdmin(admin.ModelAdmin):
             "category": obj.category,
             "expense_nature": obj.expense_nature,
             "cost_center": obj.cost_center,
+            "projet_source": obj.projet_source,
+            "projet_reference": obj.projet_reference,
+            "projet_libelle": obj.projet_libelle,
             "amount": obj.amount,
             "tax_amount": obj.tax_amount,
             "currency": obj.currency,
@@ -112,8 +122,10 @@ class ExpenseAdmin(admin.ModelAdmin):
         base = list(super().get_readonly_fields(request, obj))
         if obj and not obj.is_editable:
             base.extend([
-                "user", "category", "expense_nature", "cost_center", "amount", "tax_amount",
-                "currency", "description", "vendor", "date_incurred", "payment_method",
+                "user", "category", "expense_nature", "cost_center",
+                "projet_source", "projet_reference", "projet_libelle",
+                "amount", "tax_amount", "currency", "description", "vendor",
+                "date_incurred", "payment_method",
             ])
         return list(dict.fromkeys(base))
 
@@ -225,9 +237,12 @@ class ExpenseCommentAdmin(admin.ModelAdmin):
 
 @admin.register(BudgetDepense)
 class BudgetDepenseAdmin(admin.ModelAdmin):
-    list_display = ["nom", "date_debut", "date_fin", "montant_alloue", "montant_consomme", "montant_disponible", "bloquant", "actif"]
-    list_filter = ["actif", "bloquant", "categorie", "centre_cout"]
-    search_fields = ["nom"]
+    list_display = [
+        "nom", "projet_reference", "date_debut", "date_fin", "montant_alloue",
+        "montant_consomme", "montant_disponible", "bloquant", "actif",
+    ]
+    list_filter = ["actif", "bloquant", "categorie", "centre_cout", "projet_source"]
+    search_fields = ["nom", "projet_reference", "projet_libelle"]
 
 
 class JustificationInline(admin.TabularInline):

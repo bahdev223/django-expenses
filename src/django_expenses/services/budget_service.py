@@ -8,13 +8,22 @@ from ..settings import EXPENSES
 class BudgetService:
     @staticmethod
     def budgets_applicables(depense):
-        return BudgetDepense.objects.filter(
+        qs = BudgetDepense.objects.filter(
             actif=True,
             date_debut__lte=depense.date_incurred,
             date_fin__gte=depense.date_incurred,
         ).filter(
             Q(categorie__isnull=True) | Q(categorie=depense.category),
             Q(centre_cout__isnull=True) | Q(centre_cout=depense.cost_center),
+        )
+        # Un budget sans projet reste global. Un budget projet ne s'applique
+        # qu'aux dépenses portant exactement la même source/référence projet.
+        return qs.filter(
+            Q(projet_reference="")
+            | Q(
+                projet_source=depense.projet_source,
+                projet_reference=depense.projet_reference,
+            )
         )
 
     @classmethod

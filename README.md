@@ -207,3 +207,41 @@ python manage.py load_expense_template ohada
 ## License
 
 MIT
+
+
+## Budgets rattachés aux projets
+
+Un budget peut rester global ou être limité à un projet externe sans dépendance forte
+envers Solarplus ou un moteur de projets particulier.
+
+```python
+budget = BudgetDepense.objects.create(
+    nom="Installation solaire - lot 2026",
+    date_debut="2026-09-01",
+    date_fin="2026-12-31",
+    montant_alloue=5_000_000,
+    projet_source="solarplus",
+    projet_reference="PROJ-2026-0042",
+    projet_libelle="Installation Sikasso",
+)
+```
+
+Les dépenses du projet portent la même clé :
+
+```python
+depense = ExpenseService.create({
+    "user": request.user,
+    "category": categorie,
+    "amount": 125_000,
+    "description": "Transport matériel",
+    "date_incurred": "2026-09-15",
+    "projet_source": "solarplus",
+    "projet_reference": "PROJ-2026-0042",
+    "projet_libelle": "Installation Sikasso",
+}, user=request.user)
+```
+
+Un budget avec `projet_reference` ne consomme et ne bloque que les dépenses portant
+exactement le même couple `projet_source + projet_reference`. Les budgets sans projet
+restent globaux et continuent à s'appliquer normalement.
+

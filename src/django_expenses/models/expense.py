@@ -35,6 +35,22 @@ class Expense(models.Model):
         blank=True,
         related_name="expenses",
     )
+    projet_source = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text=_("Application/source owning the project, e.g. solarplus or django_projets"),
+    )
+    projet_reference = models.CharField(
+        max_length=120,
+        blank=True,
+        db_index=True,
+        help_text=_("Stable external project reference"),
+    )
+    projet_libelle = models.CharField(
+        max_length=240,
+        blank=True,
+        help_text=_("Project label snapshot for display"),
+    )
     status = models.CharField(
         max_length=24,
         choices=ExpenseStatus.CHOICES,
@@ -100,6 +116,10 @@ class Expense(models.Model):
             errors["amount"] = _("The amount must be greater than zero.")
         if self.tax_amount is not None and self.tax_amount < 0:
             errors["tax_amount"] = _("The tax amount cannot be negative.")
+        if bool(self.projet_source) != bool(self.projet_reference):
+            errors["projet_reference"] = _(
+                "Project source and project reference must be provided together."
+            )
         if errors:
             raise ValidationError(errors)
 
@@ -136,6 +156,12 @@ class Expense(models.Model):
     categorie = property(lambda self: self.category, lambda self, value: setattr(self, "category", value))
     nature = property(lambda self: self.expense_nature, lambda self, value: setattr(self, "expense_nature", value))
     centre_cout = property(lambda self: self.cost_center, lambda self, value: setattr(self, "cost_center", value))
+    projet = property(
+        lambda self: (
+            {"source": self.projet_source, "reference": self.projet_reference, "libelle": self.projet_libelle}
+            if self.projet_reference else None
+        )
+    )
     statut = property(lambda self: self.status, lambda self, value: setattr(self, "status", value))
     montant = property(lambda self: self.amount, lambda self, value: setattr(self, "amount", value))
     montant_taxe = property(lambda self: self.tax_amount, lambda self, value: setattr(self, "tax_amount", value))

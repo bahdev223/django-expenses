@@ -63,8 +63,14 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         "report": VIEW_REPORTS,
         "export": VIEW_REPORTS,
     }
-    filterset_fields = ["status", "category", "expense_nature", "cost_center", "currency", "user"]
-    search_fields = ["reference_number", "description", "vendor"]
+    filterset_fields = [
+        "status", "category", "expense_nature", "cost_center", "currency", "user",
+        "projet_source", "projet_reference",
+    ]
+    search_fields = [
+        "reference_number", "description", "vendor",
+        "projet_reference", "projet_libelle",
+    ]
 
     def get_queryset(self):
         qs = Expense.objects.filter(supprime_le__isnull=True).select_related(
@@ -244,8 +250,11 @@ class BudgetDepenseViewSet(viewsets.ModelViewSet):
     queryset = BudgetDepense.objects.select_related("categorie", "centre_cout").all()
     serializer_class = BudgetDepenseSerializer
     permission_classes = [ActionDjangoModelPermissions]
-    filterset_fields = ["actif", "bloquant", "categorie", "centre_cout"]
-    search_fields = ["nom"]
+    filterset_fields = [
+        "actif", "bloquant", "categorie", "centre_cout",
+        "projet_source", "projet_reference",
+    ]
+    search_fields = ["nom", "projet_reference", "projet_libelle"]
 
     def get_queryset(self):
         return HookRegistry.filter_queryset(super().get_queryset(), user=self.request.user, request=self.request)

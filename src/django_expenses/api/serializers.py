@@ -97,7 +97,9 @@ class ExpenseListSerializer(serializers.ModelSerializer):
             "amount", "tax_amount", "total", "paid", "remaining", "currency",
             "description", "vendor", "date_incurred",
             "category", "category_path", "expense_nature", "expense_nature_label",
-            "cost_center", "cost_center_name", "user", "username", "payment_method",
+            "cost_center", "cost_center_name",
+            "projet_source", "projet_reference", "projet_libelle",
+            "user", "username", "payment_method",
             "suggested_account", "date_submitted", "date_approved", "date_paid",
             "created_at", "updated_at",
         ]
@@ -123,6 +125,7 @@ class ExpenseWriteSerializer(serializers.ModelSerializer):
         model = Expense
         fields = [
             "id", "category", "expense_nature", "cost_center",
+            "projet_source", "projet_reference", "projet_libelle",
             "amount", "tax_amount", "currency", "description", "vendor",
             "date_incurred", "payment_method",
         ]
@@ -132,6 +135,8 @@ class ExpenseWriteSerializer(serializers.ModelSerializer):
 class BudgetDepenseSerializer(serializers.ModelSerializer):
     montant_consomme = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     montant_disponible = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
+    est_budget_projet = serializers.BooleanField(read_only=True)
+    projet = serializers.JSONField(read_only=True)
 
     class Meta:
         model = BudgetDepense

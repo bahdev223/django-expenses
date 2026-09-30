@@ -1,5 +1,9 @@
+from decimal import Decimal
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Sum
 from django.utils.translation import gettext_lazy as _
 
 from ..constants import ExpenseStatus, ExpenseNature, PaymentMethod
@@ -9,7 +13,7 @@ from ..managers import ExpenseQuerySet
 class Expense(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="expenses",
     )
     category = models.ForeignKey(
@@ -22,7 +26,7 @@ class Expense(models.Model):
         max_length=20,
         choices=ExpenseNature.CHOICES,
         blank=True,
-        help_text=_("Nature: operating, investment, mission, purchase..."),
+        help_text=_("Nature of the expense"),
     )
     cost_center = models.ForeignKey(
         "CostCenter",
@@ -32,7 +36,7 @@ class Expense(models.Model):
         related_name="expenses",
     )
     status = models.CharField(
-        max_length=20,
+        max_length=24,
         choices=ExpenseStatus.CHOICES,
         default=ExpenseStatus.DRAFT,
         db_index=True,
@@ -60,6 +64,14 @@ class Expense(models.Model):
         blank=True,
     )
     reference_number = models.CharField(max_length=100, unique=True, blank=True)
+    supprime_le = models.DateTimeField(null=True, blank=True)
+    supprime_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="depenses_supprimees",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -71,16 +83,43 @@ class Expense(models.Model):
         verbose_name_plural = _("Expenses")
         permissions = [
             ("approve_expense", _("Can approve expenses")),
-            ("pay_expense", _("Can mark expenses as paid")),
+            ("pay_expense", _("Can record expense payments")),
             ("view_expense_reports", _("Can view expense reports")),
+        ]
+        constraints = [
+            models.CheckConstraint(check=models.Q(amount__gt=0), name="expense_amount_gt_zero"),
+            models.CheckConstraint(check=models.Q(tax_amount__gte=0), name="expense_tax_gte_zero"),
         ]
 
     def __str__(self):
         return f"{self.reference_number or '---'} - {self.amount} {self.currency}"
 
+    def clean(self):
+        errors = {}
+        if self.amount is not None and self.amount <= 0:
+            errors["amount"] = _("The amount must be greater than zero.")
+        if self.tax_amount is not None and self.tax_amount < 0:
+            errors["tax_amount"] = _("The tax amount cannot be negative.")
+        if errors:
+            raise ValidationError(errors)
+
     @property
     def total_amount(self):
-        return self.amount + self.tax_amount
+        return (self.amount or Decimal("0")) + (self.tax_amount or Decimal("0"))
+
+    @property
+    def paid_amount(self):
+        if not self.pk:
+            return Decimal("0")
+        return self.payments.aggregate(total=Sum("amount_paid"))["total"] or Decimal("0")
+
+    @property
+    def remaining_amount(self):
+        return max(self.total_amount - self.paid_amount, Decimal("0"))
+
+    @property
+    def is_fully_paid(self):
+        return self.remaining_amount == 0 and self.total_amount > 0
 
     @property
     def is_editable(self):
@@ -91,3 +130,21 @@ class Expense(models.Model):
         if self.category and self.category.default_account_code:
             return self.category.default_account_code
         return ""
+
+    # Façade métier française : compatibilité progressive sans migration destructrice.
+    demandeur = property(lambda self: self.user, lambda self, value: setattr(self, "user", value))
+    categorie = property(lambda self: self.category, lambda self, value: setattr(self, "category", value))
+    nature = property(lambda self: self.expense_nature, lambda self, value: setattr(self, "expense_nature", value))
+    centre_cout = property(lambda self: self.cost_center, lambda self, value: setattr(self, "cost_center", value))
+    statut = property(lambda self: self.status, lambda self, value: setattr(self, "status", value))
+    montant = property(lambda self: self.amount, lambda self, value: setattr(self, "amount", value))
+    montant_taxe = property(lambda self: self.tax_amount, lambda self, value: setattr(self, "tax_amount", value))
+    montant_total = property(lambda self: self.total_amount)
+    montant_paye = property(lambda self: self.paid_amount)
+    reste_a_payer = property(lambda self: self.remaining_amount)
+    devise = property(lambda self: self.currency, lambda self, value: setattr(self, "currency", value))
+    fournisseur = property(lambda self: self.vendor, lambda self, value: setattr(self, "vendor", value))
+    date_depense = property(lambda self: self.date_incurred, lambda self, value: setattr(self, "date_incurred", value))
+    mode_paiement = property(lambda self: self.payment_method, lambda self, value: setattr(self, "payment_method", value))
+    numero_reference = property(lambda self: self.reference_number)
+    est_supprimee = property(lambda self: self.supprime_le is not None)

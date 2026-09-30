@@ -7,6 +7,7 @@ class ExpenseStatus:
     PENDING_APPROVAL = "pending_approval"
     APPROVED = "approved"
     REJECTED = "rejected"
+    PARTIALLY_PAID = "partiellement_payee"
     PAID = "paid"
     ARCHIVED = "archived"
     CANCELLED = "cancelled"
@@ -17,12 +18,13 @@ class ExpenseStatus:
         (PENDING_APPROVAL, _("En attente d'approbation")),
         (APPROVED, _("Approuvée")),
         (REJECTED, _("Rejetée")),
+        (PARTIALLY_PAID, _("Partiellement payée")),
         (PAID, _("Payée")),
         (ARCHIVED, _("Archivée")),
         (CANCELLED, _("Annulée")),
     ]
 
-    TRANSITIONABLE = {DRAFT, SUBMITTED, PENDING_APPROVAL, REJECTED}
+    TRANSITIONABLE = {DRAFT, SUBMITTED, PENDING_APPROVAL, REJECTED, PARTIALLY_PAID}
     EDITABLE = {DRAFT, REJECTED}
 
 
@@ -62,6 +64,12 @@ class ExpenseNature:
         (IMPOTS, _("Impôts et taxes")),
         (DIVERS, _("Divers")),
     ]
+
+
+# Façade métier française. Les classes historiques restent disponibles pour compatibilité.
+StatutDepense = ExpenseStatus
+ModePaiement = PaymentMethod
+NatureDepense = ExpenseNature
 
 
 # Default expense categories — imported from data module for compatibility

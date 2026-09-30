@@ -36,3 +36,11 @@ TEMPLATES = [
 ]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 USE_TZ = True
+MEDIA_ROOT = "/tmp/django_expenses_test_media"
+
+EXPENSES = {
+    "CURRENCY": "XOF",
+    "AUTO_REFERENCE_PREFIX": "DEP",
+    "ALLOW_PARTIAL_PAYMENTS": True,
+    "ENFORCE_BUDGET": True,
+}

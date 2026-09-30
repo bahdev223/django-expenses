@@ -1,26 +1,27 @@
 class ExpenseHook:
-    """
-    Base hook class for extending django-expenses behavior.
-    Subclass and override methods to add custom logic at key points.
-    """
+    """Base hook class for extending django-expenses behavior."""
 
     def before_create(self, data, user):
-        """Called before an expense is created. Return modified data or raise."""
+        return data
 
     def after_create(self, expense, user):
-        """Called after an expense is created."""
+        pass
 
     def before_transition(self, expense, target_status, user):
-        """Called before a workflow transition. Raise to block."""
+        pass
 
     def after_transition(self, expense, previous_status, user):
-        """Called after a workflow transition."""
+        pass
 
     def before_pay(self, expense, payment_data, user):
-        """Called before payment is recorded. Return modified payment_data or raise."""
+        return payment_data
 
     def after_pay(self, expense, payment, user):
-        """Called after payment is recorded."""
+        pass
+
+    def filter_queryset(self, queryset, user=None, request=None):
+        """Allow the host project to enforce organisation/tenant scoping."""
+        return queryset
 
 
 class HookRegistry:
@@ -39,3 +40,10 @@ class HookRegistry:
     @classmethod
     def get_hooks(cls):
         return list(cls._hooks)
+
+    @classmethod
+    def filter_queryset(cls, queryset, user=None, request=None):
+        qs = queryset
+        for hook in cls.get_hooks():
+            qs = hook.filter_queryset(qs, user=user, request=request) or qs
+        return qs

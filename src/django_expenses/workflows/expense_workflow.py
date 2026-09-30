@@ -8,6 +8,7 @@ class ExpenseWorkflow:
         ExpenseStatus.DRAFT: [ExpenseStatus.SUBMITTED, ExpenseStatus.CANCELLED],
         ExpenseStatus.SUBMITTED: [
             ExpenseStatus.PENDING_APPROVAL,
+            ExpenseStatus.APPROVED,
             ExpenseStatus.CANCELLED,
         ],
         ExpenseStatus.PENDING_APPROVAL: [
@@ -15,8 +16,16 @@ class ExpenseWorkflow:
             ExpenseStatus.REJECTED,
             ExpenseStatus.CANCELLED,
         ],
-        ExpenseStatus.APPROVED: [ExpenseStatus.PAID, ExpenseStatus.CANCELLED],
+        ExpenseStatus.APPROVED: [
+            ExpenseStatus.PARTIALLY_PAID,
+            ExpenseStatus.PAID,
+            ExpenseStatus.CANCELLED,
+        ],
         ExpenseStatus.REJECTED: [ExpenseStatus.SUBMITTED, ExpenseStatus.CANCELLED],
+        ExpenseStatus.PARTIALLY_PAID: [
+            ExpenseStatus.PARTIALLY_PAID,
+            ExpenseStatus.PAID,
+        ],
         ExpenseStatus.PAID: [ExpenseStatus.ARCHIVED],
         ExpenseStatus.ARCHIVED: [],
         ExpenseStatus.CANCELLED: [],
@@ -24,6 +33,7 @@ class ExpenseWorkflow:
 
     PERMISSION_MAP = {
         ExpenseStatus.APPROVED: APPROVE_EXPENSE,
+        ExpenseStatus.PARTIALLY_PAID: PAY_EXPENSE,
         ExpenseStatus.PAID: PAY_EXPENSE,
     }
 

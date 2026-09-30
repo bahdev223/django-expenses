@@ -1,12 +1,12 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from ...models import ExpenseCategory
 from ...constants import TEMPLATES as SOURCE_TEMPLATES
+from ...models import ExpenseCategory
 
 
 class Command(BaseCommand):
-    help = "Load expense category template (default, ohada, ifrs, ngo)"
+    help = "Load an expense category template (default, ohada, light)"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -22,6 +22,7 @@ class Command(BaseCommand):
             help="Delete existing categories before loading",
         )
 
+    @transaction.atomic
     def handle(self, *args, **options):
         template_name = options["template"]
 
@@ -40,7 +41,6 @@ class Command(BaseCommand):
 
         created = 0
         parent_cache = {}
-
         fields = [
             "code", "name", "parent_code", "expense_nature",
             "default_account_code", "default_vat_rate",
@@ -51,7 +51,6 @@ class Command(BaseCommand):
         for entry in template["categories"]:
             data = dict(zip(fields, entry))
             code = data["code"]
-
             if ExpenseCategory.objects.filter(code=code).exists():
                 self.stdout.write(f"  SKIP {code} (already exists)")
                 continue
@@ -63,9 +62,14 @@ class Command(BaseCommand):
                     try:
                         parent = ExpenseCategory.objects.get(code=data["parent_code"])
                     except ExpenseCategory.DoesNotExist:
+                        self.stdout.write(
+                            self.style.WARNING(
+                                f"  WARN {code}: parent {data['parent_code']} not found, skipping"
+                            )
+                        )
                         continue
 
-            cat = ExpenseCategory.objects.create(
+            category = ExpenseCategory.objects.create(
                 code=code,
                 name=data["name"],
                 parent=parent,
@@ -80,12 +84,11 @@ class Command(BaseCommand):
                 sort_order=data["sort_order"] or 0,
                 depreciation_rate=data["depreciation_rate"],
             )
-            parent_cache[code] = cat
+            parent_cache[code] = category
             created += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"\nLoaded template '{template_name}': "
-                f"{created} categories created."
+                f"\nLoaded template '{template_name}': {created} categories created."
             )
         )

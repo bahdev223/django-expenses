@@ -142,6 +142,19 @@ class BudgetDepenseSerializer(serializers.ModelSerializer):
         model = BudgetDepense
         fields = "__all__"
 
+    def validate(self, attrs):
+        source = attrs.get("projet_source", getattr(self.instance, "projet_source", ""))
+        reference = attrs.get(
+            "projet_reference", getattr(self.instance, "projet_reference", "")
+        )
+        if bool(source) != bool(reference):
+            raise serializers.ValidationError({
+                "projet_reference": (
+                    "projet_source et projet_reference doivent être renseignés ensemble."
+                )
+            })
+        return attrs
+
 
 class JustificationAvanceSerializer(serializers.ModelSerializer):
     class Meta:

@@ -10,6 +10,8 @@ class BudgetService:
     def budgets_applicables(depense):
         qs = BudgetDepense.objects.filter(
             actif=True,
+            entreprise_source=depense.entreprise_source,
+            entreprise_reference=depense.entreprise_reference,
             date_debut__lte=depense.date_incurred,
             date_fin__gte=depense.date_incurred,
         ).filter(

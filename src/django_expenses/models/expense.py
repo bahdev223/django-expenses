@@ -109,6 +109,13 @@ class Expense(models.Model):
         constraints = [
             models.CheckConstraint(check=models.Q(amount__gt=0), name="expense_amount_gt_zero"),
             models.CheckConstraint(check=models.Q(tax_amount__gte=0), name="expense_tax_gte_zero"),
+            models.CheckConstraint(
+                check=(
+                    models.Q(entreprise_source="", entreprise_reference="")
+                    | (~models.Q(entreprise_source="") & ~models.Q(entreprise_reference=""))
+                ),
+                name="expense_entreprise_coherente",
+            ),
         ]
 
     def __str__(self):

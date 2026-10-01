@@ -54,6 +54,22 @@ class EntrepriseAdminMixin:
         obj.entreprise_reference = contexte.reference
         obj.entreprise_libelle = contexte.libelle
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        contexte = self._contexte_entreprise(request)
+        if contexte is not None:
+            if db_field.related_model is ExpenseCategory:
+                kwargs["queryset"] = filtrer_par_entreprise(
+                    ExpenseCategory.objects.all(),
+                    contexte,
+                    include_global=EXPENSES["ALLOW_GLOBAL_CATEGORIES"],
+                )
+            elif db_field.related_model is CostCenter:
+                kwargs["queryset"] = filtrer_par_entreprise(
+                    CostCenter.objects.all(),
+                    contexte,
+                )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
     def save_model(self, request, obj, form, change):
         self._injecter_entreprise(obj, request)
         obj.full_clean()

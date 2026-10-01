@@ -113,6 +113,16 @@ class Migration(migrations.Migration):
             field=models.CharField(blank=True, max_length=240),
         ),
         migrations.AddConstraint(
+            model_name="evenementdepense",
+            constraint=models.CheckConstraint(
+                check=(
+                    models.Q(entreprise_source="", entreprise_reference="")
+                    | (~models.Q(entreprise_source="") & ~models.Q(entreprise_reference=""))
+                ),
+                name="evenement_depense_entreprise_coherente",
+            ),
+        ),
+        migrations.AddConstraint(
             model_name="expense",
             constraint=models.CheckConstraint(
                 check=(

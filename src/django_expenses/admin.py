@@ -1,6 +1,9 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
+from .settings import EXPENSES
+from .tenancy import filtrer_par_entreprise, resoudre_entreprise
+
 from .models import (
     Expense,
     ExpenseCategory,
@@ -15,6 +18,46 @@ from .models import (
     EvenementDepense,
 )
 from .services import ExpenseService, ReportService
+
+
+class EntrepriseAdminMixin:
+    entreprise_prefix = ""
+    include_global_entreprise = False
+
+    def _contexte_entreprise(self, request):
+        if not EXPENSES["ENABLE_MULTI_ENTREPRISE"]:
+            return None
+        if (
+            request.user.is_superuser
+            and EXPENSES["MULTI_ENTREPRISE_SUPERUSER_GLOBAL"]
+        ):
+            return None
+        return resoudre_entreprise(request, required=True)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        contexte = self._contexte_entreprise(request)
+        if contexte is None:
+            return qs
+        return filtrer_par_entreprise(
+            qs,
+            contexte,
+            prefix=self.entreprise_prefix,
+            include_global=self.include_global_entreprise,
+        )
+
+    def _injecter_entreprise(self, obj, request):
+        contexte = self._contexte_entreprise(request)
+        if contexte is None or self.entreprise_prefix:
+            return
+        obj.entreprise_source = contexte.source
+        obj.entreprise_reference = contexte.reference
+        obj.entreprise_libelle = contexte.libelle
+
+    def save_model(self, request, obj, form, change):
+        self._injecter_entreprise(obj, request)
+        obj.full_clean()
+        super().save_model(request, obj, form, change)
 
 
 class ApprovalInline(admin.TabularInline):
@@ -59,7 +102,7 @@ class EventInline(admin.TabularInline):
 
 
 @admin.register(Expense)
-class ExpenseAdmin(admin.ModelAdmin):
+class ExpenseAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
     list_display = [
         "reference_number", "colored_status", "user", "category_path", "expense_nature",
         "cost_center", "projet_reference", "amount_display", "paid_display", "remaining_display", "date_incurred",
@@ -92,7 +135,11 @@ class ExpenseAdmin(admin.ModelAdmin):
     actions = ["export_csv", "mark_paid", "mark_archived"]
 
     def save_model(self, request, obj, form, change):
+        self._injecter_entreprise(obj, request)
         data = {
+            "entreprise_source": obj.entreprise_source,
+            "entreprise_reference": obj.entreprise_reference,
+            "entreprise_libelle": obj.entreprise_libelle,
             "category": obj.category,
             "expense_nature": obj.expense_nature,
             "cost_center": obj.cost_center,
@@ -190,22 +237,27 @@ class ExpenseAdmin(admin.ModelAdmin):
 
 
 @admin.register(ExpenseCategory)
-class ExpenseCategoryAdmin(admin.ModelAdmin):
-    list_display = ["code", "name", "parent", "expense_nature", "default_account_code", "is_active", "sort_order"]
+class ExpenseCategoryAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
+    include_global_entreprise = True
+    list_display = [
+        "code", "name", "entreprise_reference", "parent", "expense_nature",
+        "default_account_code", "is_active", "sort_order",
+    ]
     list_filter = ["expense_nature", "is_active", "requires_approval", "requires_receipt", "requires_vendor"]
     search_fields = ["code", "name", "default_account_code"]
     list_editable = ["sort_order", "is_active"]
 
 
 @admin.register(CostCenter)
-class CostCenterAdmin(admin.ModelAdmin):
-    list_display = ["code", "name", "manager", "is_active"]
+class CostCenterAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
+    list_display = ["code", "name", "entreprise_reference", "manager", "is_active"]
     list_filter = ["is_active"]
     search_fields = ["code", "name", "description"]
 
 
 @admin.register(ExpenseApproval)
-class ExpenseApprovalAdmin(admin.ModelAdmin):
+class ExpenseApprovalAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
+    entreprise_prefix = "expense__"
     list_display = ["expense", "approved_by", "decision", "created_at"]
     readonly_fields = ["expense", "approved_by", "decision", "comment", "created_at"]
     def has_add_permission(self, request): return False
@@ -213,7 +265,8 @@ class ExpenseApprovalAdmin(admin.ModelAdmin):
 
 
 @admin.register(ExpensePayment)
-class ExpensePaymentAdmin(admin.ModelAdmin):
+class ExpensePaymentAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
+    entreprise_prefix = "expense__"
     list_display = ["expense", "amount_paid", "payment_date", "payment_method", "compte_reference", "paid_by"]
     list_filter = ["payment_method", "payment_date"]
     search_fields = ["reference", "expense__reference_number", "compte_reference", "cle_idempotence"]
@@ -222,23 +275,25 @@ class ExpensePaymentAdmin(admin.ModelAdmin):
 
 
 @admin.register(ExpenseAttachment)
-class ExpenseAttachmentAdmin(admin.ModelAdmin):
+class ExpenseAttachmentAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
+    entreprise_prefix = "expense__"
     list_display = ["filename", "expense", "uploaded_at"]
     def has_add_permission(self, request): return False
     def has_delete_permission(self, request, obj=None): return False
 
 
 @admin.register(ExpenseComment)
-class ExpenseCommentAdmin(admin.ModelAdmin):
+class ExpenseCommentAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
+    entreprise_prefix = "expense__"
     list_display = ["expense", "user", "created_at"]
     def has_add_permission(self, request): return False
     def has_delete_permission(self, request, obj=None): return False
 
 
 @admin.register(BudgetDepense)
-class BudgetDepenseAdmin(admin.ModelAdmin):
+class BudgetDepenseAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
     list_display = [
-        "nom", "projet_reference", "date_debut", "date_fin", "montant_alloue",
+        "nom", "entreprise_reference", "projet_reference", "date_debut", "date_fin", "montant_alloue",
         "montant_consomme", "montant_disponible", "bloquant", "actif",
     ]
     list_filter = ["actif", "bloquant", "categorie", "centre_cout", "projet_source"]
@@ -252,15 +307,18 @@ class JustificationInline(admin.TabularInline):
 
 
 @admin.register(AvanceDepense)
-class AvanceDepenseAdmin(admin.ModelAdmin):
-    list_display = ["reference", "beneficiaire", "montant_accorde", "montant_justifie", "reste_a_justifier", "statut", "date_avance"]
+class AvanceDepenseAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
+    list_display = [
+        "reference", "entreprise_reference", "beneficiaire", "montant_accorde",
+        "montant_justifie", "reste_a_justifier", "statut", "date_avance",
+    ]
     list_filter = ["statut", "date_avance"]
     search_fields = ["reference", "objet", "beneficiaire__username"]
     inlines = [JustificationInline]
 
 
 @admin.register(EvenementDepense)
-class EvenementDepenseAdmin(admin.ModelAdmin):
+class EvenementDepenseAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
     list_display = ["reference_depense", "action", "acteur", "cree_le"]
     list_filter = ["action", "cree_le"]
     search_fields = ["reference_depense", "action"]

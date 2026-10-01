@@ -11,6 +11,10 @@ from ..managers import ExpenseQuerySet
 
 
 class Expense(models.Model):
+    entreprise_source = models.CharField(max_length=80, blank=True, db_index=True)
+    entreprise_reference = models.CharField(max_length=120, blank=True, db_index=True)
+    entreprise_libelle = models.CharField(max_length=240, blank=True)
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -105,6 +109,13 @@ class Expense(models.Model):
         constraints = [
             models.CheckConstraint(check=models.Q(amount__gt=0), name="expense_amount_gt_zero"),
             models.CheckConstraint(check=models.Q(tax_amount__gte=0), name="expense_tax_gte_zero"),
+            models.CheckConstraint(
+                check=(
+                    models.Q(entreprise_source="", entreprise_reference="")
+                    | (~models.Q(entreprise_source="") & ~models.Q(entreprise_reference=""))
+                ),
+                name="expense_entreprise_coherente",
+            ),
         ]
 
     def __str__(self):
@@ -120,6 +131,26 @@ class Expense(models.Model):
             errors["projet_reference"] = _(
                 "Project source and project reference must be provided together."
             )
+        if bool(self.entreprise_source) != bool(self.entreprise_reference):
+            errors["entreprise_reference"] = _(
+                "Company source and company reference must be provided together."
+            )
+        if self.category_id:
+            categorie_globale = (
+                not self.category.entreprise_source
+                and not self.category.entreprise_reference
+            )
+            meme_entreprise = (
+                self.category.entreprise_source == self.entreprise_source
+                and self.category.entreprise_reference == self.entreprise_reference
+            )
+            if not (categorie_globale or meme_entreprise):
+                errors["category"] = _("The category belongs to another company.")
+        if self.cost_center_id and (
+            self.cost_center.entreprise_source != self.entreprise_source
+            or self.cost_center.entreprise_reference != self.entreprise_reference
+        ):
+            errors["cost_center"] = _("The cost center belongs to another company.")
         if errors:
             raise ValidationError(errors)
 
@@ -152,6 +183,16 @@ class Expense(models.Model):
         return ""
 
     # Façade métier française : compatibilité progressive sans migration destructrice.
+    entreprise = property(
+        lambda self: (
+            {
+                "source": self.entreprise_source,
+                "reference": self.entreprise_reference,
+                "libelle": self.entreprise_libelle,
+            }
+            if self.entreprise_reference else None
+        )
+    )
     demandeur = property(lambda self: self.user, lambda self, value: setattr(self, "user", value))
     categorie = property(lambda self: self.category, lambda self, value: setattr(self, "category", value))
     nature = property(lambda self: self.expense_nature, lambda self, value: setattr(self, "expense_nature", value))

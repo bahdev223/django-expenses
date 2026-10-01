@@ -7,6 +7,10 @@ from django.utils.translation import gettext_lazy as _
 
 
 class AvanceDepense(models.Model):
+    entreprise_source = models.CharField(max_length=80, blank=True, db_index=True)
+    entreprise_reference = models.CharField(max_length=120, blank=True, db_index=True)
+    entreprise_libelle = models.CharField(max_length=240, blank=True)
+
     class Statut(models.TextChoices):
         OUVERTE = "ouverte", _("Ouverte")
         PARTIELLEMENT_JUSTIFIEE = "partiellement_justifiee", _("Partiellement justifiée")
@@ -28,7 +32,7 @@ class AvanceDepense(models.Model):
     date_avance = models.DateField()
     objet = models.CharField(max_length=300)
     statut = models.CharField(max_length=30, choices=Statut.choices, default=Statut.OUVERTE)
-    reference = models.CharField(max_length=100, unique=True)
+    reference = models.CharField(max_length=100, db_index=True)
     compte_reference = models.CharField(max_length=120, blank=True)
     notes = models.TextField(blank=True)
     cree_le = models.DateTimeField(auto_now_add=True)
@@ -39,7 +43,18 @@ class AvanceDepense(models.Model):
         verbose_name = _("Avance de dépense")
         verbose_name_plural = _("Avances de dépenses")
         constraints = [
-            models.CheckConstraint(check=models.Q(montant_accorde__gt=0), name="avance_depense_montant_gt_zero")
+            models.CheckConstraint(check=models.Q(montant_accorde__gt=0), name="avance_depense_montant_gt_zero"),
+            models.UniqueConstraint(
+                fields=["entreprise_source", "entreprise_reference", "reference"],
+                name="avance_reference_par_entreprise",
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(entreprise_source="", entreprise_reference="")
+                    | (~models.Q(entreprise_source="") & ~models.Q(entreprise_reference=""))
+                ),
+                name="avance_entreprise_coherente",
+            ),
         ]
 
     def __str__(self):

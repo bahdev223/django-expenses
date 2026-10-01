@@ -1,5 +1,8 @@
 from rest_framework import serializers
 
+from ..settings import EXPENSES
+from ..tenancy import resoudre_entreprise
+
 from ..models import (
     Expense,
     ExpenseCategory,
@@ -21,9 +24,41 @@ class ExpenseCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ExpenseCategory
         fields = "__all__"
+        read_only_fields = [
+            "entreprise_source", "entreprise_reference", "entreprise_libelle"
+        ]
 
     def get_children_count(self, obj):
-        return obj.children.filter(is_active=True).count()
+        qs = obj.children.filter(is_active=True)
+        contexte = resoudre_entreprise(
+            self.context.get("request"),
+            required=EXPENSES["ENABLE_MULTI_ENTREPRISE"],
+        )
+        if contexte:
+            from ..tenancy import filtrer_par_entreprise
+
+            qs = filtrer_par_entreprise(
+                qs,
+                contexte,
+                include_global=EXPENSES["ALLOW_GLOBAL_CATEGORIES"],
+            )
+        return qs.count()
+
+    def validate(self, attrs):
+        contexte = resoudre_entreprise(
+            self.context.get("request"),
+            required=EXPENSES["ENABLE_MULTI_ENTREPRISE"],
+        )
+        parent = attrs.get("parent", getattr(self.instance, "parent", None))
+        if contexte and parent and not parent.est_globale:
+            if (
+                parent.entreprise_source != contexte.source
+                or parent.entreprise_reference != contexte.reference
+            ):
+                raise serializers.ValidationError({
+                    "parent": "La catégorie parente appartient à une autre entreprise."
+                })
+        return attrs
 
 
 class ExpenseCategoryTreeSerializer(serializers.ModelSerializer):
@@ -32,7 +67,8 @@ class ExpenseCategoryTreeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExpenseCategory
         fields = [
-            "id", "code", "name", "parent", "expense_nature",
+            "id", "entreprise_source", "entreprise_reference", "entreprise_libelle",
+            "code", "name", "parent", "expense_nature",
             "default_account_code", "default_vat_rate",
             "requires_approval", "requires_receipt", "requires_vendor",
             "color", "icon", "sort_order", "is_active", "children",
@@ -40,13 +76,32 @@ class ExpenseCategoryTreeSerializer(serializers.ModelSerializer):
 
     def get_children(self, obj):
         qs = obj.children.filter(is_active=True).order_by("sort_order", "code")
-        return ExpenseCategoryTreeSerializer(qs, many=True).data
+        contexte = resoudre_entreprise(
+            self.context.get("request"),
+            required=EXPENSES["ENABLE_MULTI_ENTREPRISE"],
+        )
+        if contexte:
+            from ..tenancy import filtrer_par_entreprise
+
+            qs = filtrer_par_entreprise(
+                qs,
+                contexte,
+                include_global=EXPENSES["ALLOW_GLOBAL_CATEGORIES"],
+            )
+        return ExpenseCategoryTreeSerializer(
+            qs,
+            many=True,
+            context=self.context,
+        ).data
 
 
 class CostCenterSerializer(serializers.ModelSerializer):
     class Meta:
         model = CostCenter
         fields = "__all__"
+        read_only_fields = [
+            "entreprise_source", "entreprise_reference", "entreprise_libelle"
+        ]
 
 
 class ExpenseAttachmentSerializer(serializers.ModelSerializer):
@@ -98,6 +153,7 @@ class ExpenseListSerializer(serializers.ModelSerializer):
             "description", "vendor", "date_incurred",
             "category", "category_path", "expense_nature", "expense_nature_label",
             "cost_center", "cost_center_name",
+            "entreprise_source", "entreprise_reference", "entreprise_libelle",
             "projet_source", "projet_reference", "projet_libelle",
             "user", "username", "payment_method",
             "suggested_account", "date_submitted", "date_approved", "date_paid",
@@ -125,11 +181,14 @@ class ExpenseWriteSerializer(serializers.ModelSerializer):
         model = Expense
         fields = [
             "id", "category", "expense_nature", "cost_center",
+            "entreprise_source", "entreprise_reference", "entreprise_libelle",
             "projet_source", "projet_reference", "projet_libelle",
             "amount", "tax_amount", "currency", "description", "vendor",
             "date_incurred", "payment_method",
         ]
-        read_only_fields = ["id"]
+        read_only_fields = [
+            "id", "entreprise_source", "entreprise_reference", "entreprise_libelle"
+        ]
 
 
 class BudgetDepenseSerializer(serializers.ModelSerializer):
@@ -141,6 +200,9 @@ class BudgetDepenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = BudgetDepense
         fields = "__all__"
+        read_only_fields = [
+            "entreprise_source", "entreprise_reference", "entreprise_libelle"
+        ]
 
     def validate(self, attrs):
         source = attrs.get("projet_source", getattr(self.instance, "projet_source", ""))
@@ -152,6 +214,35 @@ class BudgetDepenseSerializer(serializers.ModelSerializer):
                 "projet_reference": (
                     "projet_source et projet_reference doivent être renseignés ensemble."
                 )
+            })
+        contexte = resoudre_entreprise(
+            self.context.get("request"),
+            required=EXPENSES["ENABLE_MULTI_ENTREPRISE"],
+        )
+        entreprise_source = (
+            contexte.source if contexte
+            else getattr(self.instance, "entreprise_source", "")
+        )
+        entreprise_reference = (
+            contexte.reference if contexte
+            else getattr(self.instance, "entreprise_reference", "")
+        )
+        categorie = attrs.get("categorie", getattr(self.instance, "categorie", None))
+        if categorie and (categorie.entreprise_source or categorie.entreprise_reference):
+            if (
+                categorie.entreprise_source != entreprise_source
+                or categorie.entreprise_reference != entreprise_reference
+            ):
+                raise serializers.ValidationError({
+                    "categorie": "La catégorie appartient à une autre entreprise."
+                })
+        centre = attrs.get("centre_cout", getattr(self.instance, "centre_cout", None))
+        if centre and (
+            centre.entreprise_source != entreprise_source
+            or centre.entreprise_reference != entreprise_reference
+        ):
+            raise serializers.ValidationError({
+                "centre_cout": "Le centre de coût appartient à une autre entreprise."
             })
         return attrs
 
@@ -171,4 +262,7 @@ class AvanceDepenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvanceDepense
         fields = "__all__"
-        read_only_fields = ["cree_par", "statut", "cree_le", "modifie_le"]
+        read_only_fields = [
+            "cree_par", "statut", "cree_le", "modifie_le",
+            "entreprise_source", "entreprise_reference", "entreprise_libelle",
+        ]

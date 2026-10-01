@@ -19,6 +19,7 @@ from ..models import (
 )
 from ..permissions import CHANGE_EXPENSE, DELETE_EXPENSE
 from ..settings import EXPENSES
+from ..tenancy import ContexteEntreprise, appartient_a_entreprise
 from ..signals import (
     expense_created,
     expense_updated,
@@ -39,6 +40,9 @@ class ExpenseService:
     @staticmethod
     def _journaliser(expense, action, user=None, donnees=None):
         EvenementDepense.objects.create(
+            entreprise_source=expense.entreprise_source,
+            entreprise_reference=expense.entreprise_reference,
+            entreprise_libelle=expense.entreprise_libelle,
             depense=expense,
             reference_depense=expense.reference_number,
             action=action,
@@ -62,6 +66,39 @@ class ExpenseService:
                     "projet_source et projet_reference doivent être renseignés ensemble."
                 )
             })
+
+        entreprise_source = data.get(
+            "entreprise_source", getattr(instance, "entreprise_source", "")
+        )
+        entreprise_reference = data.get(
+            "entreprise_reference", getattr(instance, "entreprise_reference", "")
+        )
+        if bool(entreprise_source) != bool(entreprise_reference):
+            raise ValidationError({
+                "entreprise_reference": (
+                    "entreprise_source et entreprise_reference doivent être renseignés ensemble."
+                )
+            })
+        if EXPENSES["ENABLE_MULTI_ENTREPRISE"] and not (
+            entreprise_source and entreprise_reference
+        ):
+            raise ValidationError("Une entreprise est obligatoire en mode multi-entreprise.")
+
+        contexte = (
+            ContexteEntreprise(entreprise_source, entreprise_reference)
+            if entreprise_source and entreprise_reference else None
+        )
+        category = data.get("category", getattr(instance, "category", None))
+        if category is not None and contexte is not None:
+            allow_global = EXPENSES["ALLOW_GLOBAL_CATEGORIES"]
+            if not appartient_a_entreprise(category, contexte, allow_global=allow_global):
+                raise ValidationError({"category": "La catégorie appartient à une autre entreprise."})
+        cost_center = data.get("cost_center", getattr(instance, "cost_center", None))
+        if cost_center is not None and contexte is not None:
+            if not appartient_a_entreprise(cost_center, contexte):
+                raise ValidationError({
+                    "cost_center": "Le centre de coût appartient à une autre entreprise."
+                })
 
     @staticmethod
     def _validate_submission(expense):

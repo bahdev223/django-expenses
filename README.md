@@ -209,6 +209,66 @@ python manage.py load_expense_template ohada
 MIT
 
 
+## Multi-entreprise
+
+Le moteur peut fonctionner en mono-entreprise (comportement historique) ou en
+multi-entreprise strict.
+
+```python
+EXPENSES = {
+    "ENABLE_MULTI_ENTREPRISE": True,
+    "ENTREPRISE_RESOLVER": "mon_projet.tenancy.resolve_expense_company",
+    "ALLOW_GLOBAL_CATEGORIES": True,
+}
+```
+
+Le resolver est exécuté côté serveur et doit retourner une entreprise déjà
+autorisée pour l'utilisateur courant :
+
+```python
+def resolve_expense_company(request):
+    organisation = request.organisation_active
+    return {
+        "source": "saheltech-platform",
+        "reference": str(organisation.pk),
+        "libelle": organisation.nom,
+    }
+```
+
+Le client HTTP ne choisit jamais directement l'entreprise de la dépense. Les
+champs `entreprise_source`, `entreprise_reference` et
+`entreprise_libelle` sont injectés depuis ce contexte serveur.
+
+Quand le mode multi-entreprise est actif sans contexte valide, les API et
+l'admin refusent l'accès (fail-closed).
+
+Les données sont isolées sur :
+
+- dépenses ;
+- budgets ;
+- avances ;
+- centres de coût ;
+- catégories propres à l'entreprise ;
+- paiements, approbations, commentaires et pièces jointes via leur dépense ;
+- événements d'audit.
+
+Les catégories OHADA peuvent rester globales et en lecture seule pour les
+entreprises. Un même code de catégorie ou de centre de coût peut exister dans
+plusieurs entreprises.
+
+Avant d'activer le multi-entreprise sur une base existante :
+
+```bash
+python manage.py migrate
+python manage.py assign_legacy_entreprise \
+  --source saheltech-platform \
+  --reference ENT-001 \
+  --libelle "Entreprise démo"
+```
+
+Les catégories restent globales par défaut. Ajouter `--categories` uniquement
+si les catégories historiques doivent devenir propres à cette entreprise.
+
 ## Budgets rattachés aux projets
 
 Un budget peut rester global ou être limité à un projet externe sans dépendance forte

@@ -48,6 +48,13 @@ class AvanceDepense(models.Model):
                 fields=["entreprise_source", "entreprise_reference", "reference"],
                 name="avance_reference_par_entreprise",
             ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(entreprise_source="", entreprise_reference="")
+                    | (~models.Q(entreprise_source="") & ~models.Q(entreprise_reference=""))
+                ),
+                name="avance_entreprise_coherente",
+            ),
         ]
 
     def __str__(self):

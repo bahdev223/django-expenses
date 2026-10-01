@@ -63,7 +63,23 @@ class ExpenseCategoryTreeSerializer(serializers.ModelSerializer):
 
     def get_children(self, obj):
         qs = obj.children.filter(is_active=True).order_by("sort_order", "code")
-        return ExpenseCategoryTreeSerializer(qs, many=True).data
+        contexte = resoudre_entreprise(
+            self.context.get("request"),
+            required=EXPENSES["ENABLE_MULTI_ENTREPRISE"],
+        )
+        if contexte:
+            from ..tenancy import filtrer_par_entreprise
+
+            qs = filtrer_par_entreprise(
+                qs,
+                contexte,
+                include_global=EXPENSES["ALLOW_GLOBAL_CATEGORIES"],
+            )
+        return ExpenseCategoryTreeSerializer(
+            qs,
+            many=True,
+            context=self.context,
+        ).data
 
 
 class CostCenterSerializer(serializers.ModelSerializer):

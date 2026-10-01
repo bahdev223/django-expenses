@@ -9,6 +9,12 @@ from rest_framework.response import Response
 
 from ..exceptions import WorkflowError
 from ..hooks import HookRegistry
+from ..settings import EXPENSES
+from ..tenancy import (
+    filtrer_par_entreprise,
+    resoudre_entreprise,
+    verifier_appartenance,
+)
 from ..models import (
     Expense,
     ExpenseCategory,
@@ -38,6 +44,28 @@ from .serializers import (
     AvanceDepenseSerializer,
     JustificationAvanceSerializer,
 )
+
+
+def _contexte_entreprise(request):
+    return resoudre_entreprise(
+        request,
+        required=EXPENSES["ENABLE_MULTI_ENTREPRISE"],
+    )
+
+
+def _scope_entreprise(queryset, request, *, prefix="", include_global=False):
+    contexte = _contexte_entreprise(request)
+    return filtrer_par_entreprise(
+        queryset,
+        contexte,
+        prefix=prefix,
+        include_global=include_global,
+    )
+
+
+def _entreprise_kwargs(request):
+    contexte = _contexte_entreprise(request)
+    return contexte.as_kwargs() if contexte else {}
 
 
 def _api_error(exc):
@@ -76,6 +104,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         qs = Expense.objects.filter(supprime_le__isnull=True).select_related(
             "user", "category", "cost_center", "approved_by"
         ).prefetch_related("attachments", "approvals", "payments", "comments")
+        qs = _scope_entreprise(qs, self.request)
         return HookRegistry.filter_queryset(qs, user=self.request.user, request=self.request)
 
     def get_serializer_class(self):
@@ -85,12 +114,24 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             return ExpenseWriteSerializer
         return ExpenseDetailSerializer
 
+    def get_queryset(self):
+        return _scope_entreprise(
+            super().get_queryset(),
+            self.request,
+            prefix="expense__",
+        )
+
     def create(self, request, *args, **kwargs):
         serializer = ExpenseWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             depense = ExpenseService.create(
-                {**serializer.validated_data, "user": request.user}, user=request.user
+                {
+                    **serializer.validated_data,
+                    **_entreprise_kwargs(request),
+                    "user": request.user,
+                },
+                user=request.user,
             )
         except (WorkflowError, DjangoValidationError, PermissionDenied) as exc:
             return _api_error(exc)
@@ -176,7 +217,12 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             end_date = datetime.strptime(end, "%Y-%m-%d").date()
         except ValueError:
             return Response({"error": "Dates attendues au format YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
-        report = ReportService.generate_report(start_date, end_date, request.query_params.get("cost_center"))
+        report = ReportService.generate_report(
+            start_date,
+            end_date,
+            request.query_params.get("cost_center"),
+            queryset=self.get_queryset(),
+        )
         return Response(report)
 
     @action(detail=False, methods=["get"])
@@ -189,7 +235,9 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 class ExpenseCategoryViewSet(viewsets.ModelViewSet):
     queryset = ExpenseCategory.objects.all()
     permission_classes = [ActionDjangoModelPermissions]
-    filterset_fields = ["expense_nature", "is_active"]
+    filterset_fields = [
+        "expense_nature", "is_active", "entreprise_source", "entreprise_reference"
+    ]
     search_fields = ["code", "name", "default_account_code"]
 
     def get_serializer_class(self):
@@ -197,16 +245,63 @@ class ExpenseCategoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = ExpenseCategory.objects.select_related("parent")
+        qs = _scope_entreprise(
+            qs,
+            self.request,
+            include_global=EXPENSES["ALLOW_GLOBAL_CATEGORIES"],
+        )
         if self.request.query_params.get("roots"):
             qs = qs.filter(parent__isnull=True)
         return qs
+
+    def perform_create(self, serializer):
+        serializer.save(**_entreprise_kwargs(self.request))
+
+    def perform_update(self, serializer):
+        obj = self.get_object()
+        if (
+            EXPENSES["ENABLE_MULTI_ENTREPRISE"]
+            and getattr(obj, "est_globale", False)
+            and not (
+                self.request.user.is_superuser
+                and EXPENSES["MULTI_ENTREPRISE_SUPERUSER_GLOBAL"]
+            )
+        ):
+            raise PermissionDenied(
+                "Les catégories globales sont en lecture seule dans ce contexte."
+            )
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if (
+            EXPENSES["ENABLE_MULTI_ENTREPRISE"]
+            and getattr(instance, "est_globale", False)
+            and not (
+                self.request.user.is_superuser
+                and EXPENSES["MULTI_ENTREPRISE_SUPERUSER_GLOBAL"]
+            )
+        ):
+            raise PermissionDenied(
+                "Les catégories globales sont en lecture seule dans ce contexte."
+            )
+        instance.delete()
 
 
 class CostCenterViewSet(viewsets.ModelViewSet):
     queryset = CostCenter.objects.all()
     serializer_class = CostCenterSerializer
     permission_classes = [ActionDjangoModelPermissions]
+    filterset_fields = ["entreprise_source", "entreprise_reference", "is_active"]
     search_fields = ["code", "name"]
+
+    def get_queryset(self):
+        return _scope_entreprise(
+            super().get_queryset(),
+            self.request,
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(**_entreprise_kwargs(self.request))
 
 
 class ExpensePaymentViewSet(viewsets.ReadOnlyModelViewSet):
@@ -215,12 +310,26 @@ class ExpensePaymentViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ["payment_method", "expense", "compte_reference"]
     permission_classes = [ActionDjangoModelPermissions]
 
+    def get_queryset(self):
+        return _scope_entreprise(
+            super().get_queryset(),
+            self.request,
+            prefix="expense__",
+        )
+
 
 class ExpenseApprovalViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ExpenseApproval.objects.select_related("expense", "approved_by").all()
     serializer_class = ExpenseApprovalSerializer
     filterset_fields = ["decision", "expense"]
     permission_classes = [ActionDjangoModelPermissions]
+
+    def get_queryset(self):
+        return _scope_entreprise(
+            super().get_queryset(),
+            self.request,
+            prefix="expense__",
+        )
 
 
 class ExpenseCommentViewSet(viewsets.ModelViewSet):
@@ -235,6 +344,12 @@ class ExpenseCommentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         try:
+            contexte = _contexte_entreprise(request)
+            verifier_appartenance(
+                data["expense"],
+                contexte,
+                label="Dépense",
+            )
             commentaire = ExpenseService.add_comment(
                 data["expense"], data["comment"], user=request.user
             )
@@ -257,7 +372,11 @@ class BudgetDepenseViewSet(viewsets.ModelViewSet):
     search_fields = ["nom", "projet_reference", "projet_libelle"]
 
     def get_queryset(self):
-        return HookRegistry.filter_queryset(super().get_queryset(), user=self.request.user, request=self.request)
+        qs = _scope_entreprise(super().get_queryset(), self.request)
+        return HookRegistry.filter_queryset(qs, user=self.request.user, request=self.request)
+
+    def perform_create(self, serializer):
+        serializer.save(**_entreprise_kwargs(self.request))
 
 
 class AvanceDepenseViewSet(viewsets.ModelViewSet):
@@ -268,17 +387,22 @@ class AvanceDepenseViewSet(viewsets.ModelViewSet):
     queryset = AvanceDepense.objects.select_related("beneficiaire", "cree_par").prefetch_related("justifications")
     serializer_class = AvanceDepenseSerializer
     permission_classes = [ActionDjangoModelPermissions]
-    filterset_fields = ["statut", "beneficiaire", "compte_reference"]
+    filterset_fields = [
+        "statut", "beneficiaire", "compte_reference",
+        "entreprise_source", "entreprise_reference",
+    ]
     search_fields = ["reference", "objet"]
 
     def get_queryset(self):
-        return HookRegistry.filter_queryset(super().get_queryset(), user=self.request.user, request=self.request)
+        qs = _scope_entreprise(super().get_queryset(), self.request)
+        return HookRegistry.filter_queryset(qs, user=self.request.user, request=self.request)
 
     def create(self, request, *args, **kwargs):
         serializer = AvanceDepenseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         try:
+            entreprise = _entreprise_kwargs(request)
             avance = AvanceService.creer(
                 beneficiaire=data["beneficiaire"],
                 montant_accorde=data["montant_accorde"],
@@ -288,6 +412,7 @@ class AvanceDepenseViewSet(viewsets.ModelViewSet):
                 cree_par=request.user,
                 compte_reference=data.get("compte_reference", ""),
                 notes=data.get("notes", ""),
+                **entreprise,
             )
         except DjangoValidationError as exc:
             return _api_error(exc)

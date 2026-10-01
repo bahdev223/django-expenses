@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from ..models import AvanceDepense, JustificationAvance
+from ..settings import EXPENSES
 from ..signals import avance_creee, avance_justifiee, avance_soldee
 
 
@@ -20,6 +21,10 @@ class AvanceService:
             raise ValidationError(
                 "entreprise_source et entreprise_reference doivent être renseignés ensemble."
             )
+        if EXPENSES["ENABLE_MULTI_ENTREPRISE"] and not (
+            entreprise_source and entreprise_reference
+        ):
+            raise ValidationError("Une entreprise est obligatoire en mode multi-entreprise.")
 
         avance = AvanceDepense.objects.create(
             entreprise_source=entreprise_source,

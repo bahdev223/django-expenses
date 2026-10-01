@@ -28,6 +28,17 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         template_name = options["template"]
+        source = options["entreprise_source"]
+        reference = options["entreprise_reference"]
+        libelle = options["entreprise_libelle"]
+        if bool(source) != bool(reference):
+            raise CommandError(
+                "--entreprise-source et --entreprise-reference doivent être fournis ensemble."
+            )
+        scope = {
+            "entreprise_source": source,
+            "entreprise_reference": reference,
+        }
 
         if template_name == "list":
             self.stdout.write("Available templates:")
@@ -39,7 +50,7 @@ class Command(BaseCommand):
         template = SOURCE_TEMPLATES[template_name]
 
         if options["force"]:
-            deleted, _ = ExpenseCategory.objects.all().delete()
+            deleted, _ = ExpenseCategory.objects.filter(**scope).delete()
             self.stdout.write(f"Deleted {deleted} existing categories.")
 
         created = 0

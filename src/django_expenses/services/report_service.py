@@ -8,8 +8,9 @@ from ..models import Expense
 
 class ReportService:
     @staticmethod
-    def generate_report(start_date, end_date, cost_center=None):
-        qs = Expense.objects.filter(supprime_le__isnull=True).by_period(start_date, end_date)
+    def generate_report(start_date, end_date, cost_center=None, queryset=None):
+        base = queryset if queryset is not None else Expense.objects.filter(supprime_le__isnull=True)
+        qs = base.by_period(start_date, end_date)
         if cost_center:
             qs = qs.filter(cost_center_id=cost_center)
         return {

@@ -29,7 +29,20 @@ class ExpenseCategorySerializer(serializers.ModelSerializer):
         ]
 
     def get_children_count(self, obj):
-        return obj.children.filter(is_active=True).count()
+        qs = obj.children.filter(is_active=True)
+        contexte = resoudre_entreprise(
+            self.context.get("request"),
+            required=EXPENSES["ENABLE_MULTI_ENTREPRISE"],
+        )
+        if contexte:
+            from ..tenancy import filtrer_par_entreprise
+
+            qs = filtrer_par_entreprise(
+                qs,
+                contexte,
+                include_global=EXPENSES["ALLOW_GLOBAL_CATEGORIES"],
+            )
+        return qs.count()
 
     def validate(self, attrs):
         contexte = resoudre_entreprise(

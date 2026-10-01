@@ -5,7 +5,10 @@ from ..constants import ExpenseNature
 
 
 class ExpenseCategory(models.Model):
-    code = models.CharField(max_length=50, unique=True, db_index=True)
+    entreprise_source = models.CharField(max_length=80, blank=True, db_index=True)
+    entreprise_reference = models.CharField(max_length=120, blank=True, db_index=True)
+    entreprise_libelle = models.CharField(max_length=240, blank=True)
+    code = models.CharField(max_length=50, db_index=True)
     name = models.CharField(max_length=200)
     parent = models.ForeignKey(
         "self",
@@ -67,6 +70,35 @@ class ExpenseCategory(models.Model):
         ordering = ["sort_order", "code"]
         verbose_name = _("Expense category")
         verbose_name_plural = _("Expense categories")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["entreprise_source", "entreprise_reference", "code"],
+                name="expense_category_code_par_entreprise",
+            ),
+        ]
+
+    @property
+    def est_globale(self):
+        return not self.entreprise_source and not self.entreprise_reference
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        errors = {}
+        if bool(self.entreprise_source) != bool(self.entreprise_reference):
+            errors["entreprise_reference"] = (
+                "entreprise_source et entreprise_reference doivent être renseignés ensemble."
+            )
+        if self.parent_id:
+            parent_global = self.parent.est_globale
+            meme_entreprise = (
+                self.parent.entreprise_source == self.entreprise_source
+                and self.parent.entreprise_reference == self.entreprise_reference
+            )
+            if not (parent_global or meme_entreprise):
+                errors["parent"] = "La catégorie parente appartient à une autre entreprise."
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self):
         if self.parent:

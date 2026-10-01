@@ -4,7 +4,10 @@ from django.utils.translation import gettext_lazy as _
 
 
 class CostCenter(models.Model):
-    code = models.CharField(max_length=50, unique=True)
+    entreprise_source = models.CharField(max_length=80, blank=True, db_index=True)
+    entreprise_reference = models.CharField(max_length=120, blank=True, db_index=True)
+    entreprise_libelle = models.CharField(max_length=240, blank=True)
+    code = models.CharField(max_length=50, db_index=True)
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     manager = models.ForeignKey(
@@ -22,6 +25,12 @@ class CostCenter(models.Model):
         ordering = ["code"]
         verbose_name = _("Cost center")
         verbose_name_plural = _("Cost centers")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["entreprise_source", "entreprise_reference", "code"],
+                name="cost_center_code_par_entreprise",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.code} - {self.name}"

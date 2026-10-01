@@ -4,11 +4,16 @@ from django.http import HttpResponse
 
 from ..constants import ExpenseStatus
 from ..models import Expense
+from ..settings import EXPENSES
 
 
 class ReportService:
     @staticmethod
     def generate_report(start_date, end_date, cost_center=None, queryset=None):
+        if queryset is None and EXPENSES["ENABLE_MULTI_ENTREPRISE"]:
+            raise ValueError(
+                "Un queryset déjà scindé par entreprise est obligatoire en mode multi-entreprise."
+            )
         base = queryset if queryset is not None else Expense.objects.filter(supprime_le__isnull=True)
         qs = base.by_period(start_date, end_date)
         if cost_center:

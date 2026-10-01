@@ -59,6 +59,13 @@ class BudgetDepense(models.Model):
             models.CheckConstraint(check=Q(date_fin__gte=F("date_debut")), name="budget_depense_dates_valides"),
             models.CheckConstraint(
                 check=(
+                    Q(entreprise_source="", entreprise_reference="")
+                    | (~Q(entreprise_source="") & ~Q(entreprise_reference=""))
+                ),
+                name="budget_depense_entreprise_coherente",
+            ),
+            models.CheckConstraint(
+                check=(
                     Q(projet_source="", projet_reference="")
                     | (~Q(projet_source="") & ~Q(projet_reference=""))
                 ),

@@ -114,13 +114,6 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             return ExpenseWriteSerializer
         return ExpenseDetailSerializer
 
-    def get_queryset(self):
-        return _scope_entreprise(
-            super().get_queryset(),
-            self.request,
-            prefix="expense__",
-        )
-
     def create(self, request, *args, **kwargs):
         serializer = ExpenseWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -338,6 +331,13 @@ class ExpenseCommentViewSet(viewsets.ModelViewSet):
     permission_classes = [ActionDjangoModelPermissions]
     action_permission_map = {"create": CHANGE_EXPENSE}
     http_method_names = ["get", "post", "head", "options"]
+
+    def get_queryset(self):
+        return _scope_entreprise(
+            super().get_queryset(),
+            self.request,
+            prefix="expense__",
+        )
 
     def create(self, request, *args, **kwargs):
         serializer = ExpenseCommentSerializer(data=request.data)

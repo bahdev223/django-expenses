@@ -59,6 +59,30 @@ class EntrepriseAdminMixin:
         obj.full_clean()
         super().save_model(request, obj, form, change)
 
+    def _global_protege(self, request, obj):
+        if not (
+            EXPENSES["ENABLE_MULTI_ENTREPRISE"]
+            and self.include_global_entreprise
+            and obj is not None
+            and not getattr(obj, "entreprise_source", "")
+            and not getattr(obj, "entreprise_reference", "")
+        ):
+            return False
+        return not (
+            request.user.is_superuser
+            and EXPENSES["MULTI_ENTREPRISE_SUPERUSER_GLOBAL"]
+        )
+
+    def has_change_permission(self, request, obj=None):
+        if self._global_protege(request, obj):
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if self._global_protege(request, obj):
+            return False
+        return super().has_delete_permission(request, obj)
+
 
 class ApprovalInline(admin.TabularInline):
     model = ExpenseApproval

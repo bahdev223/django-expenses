@@ -11,11 +11,20 @@ class AvanceService:
     @staticmethod
     @transaction.atomic
     def creer(*, beneficiaire, montant_accorde, date_avance, objet, reference, cree_par,
-              compte_reference="", notes=""):
+              compte_reference="", notes="", entreprise_source="",
+              entreprise_reference="", entreprise_libelle=""):
         montant_accorde = Decimal(str(montant_accorde))
         if montant_accorde <= 0:
             raise ValidationError("Le montant de l'avance doit être supérieur à zéro.")
+        if bool(entreprise_source) != bool(entreprise_reference):
+            raise ValidationError(
+                "entreprise_source et entreprise_reference doivent être renseignés ensemble."
+            )
+
         avance = AvanceDepense.objects.create(
+            entreprise_source=entreprise_source,
+            entreprise_reference=entreprise_reference,
+            entreprise_libelle=entreprise_libelle,
             beneficiaire=beneficiaire,
             montant_accorde=montant_accorde,
             date_avance=date_avance,
@@ -39,6 +48,14 @@ class AvanceService:
             raise ValidationError("Le montant justifié doit être supérieur à zéro.")
         if montant > avance.reste_a_justifier:
             raise ValidationError("Le montant justifié dépasse le reste à justifier.")
+
+        if depense is not None and (
+            depense.entreprise_source != avance.entreprise_source
+            or depense.entreprise_reference != avance.entreprise_reference
+        ):
+            raise ValidationError(
+                "La dépense utilisée pour justifier l'avance appartient à une autre entreprise."
+            )
 
         justification = JustificationAvance.objects.create(
             avance=avance,

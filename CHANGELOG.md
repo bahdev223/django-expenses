@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased - Multi-entreprise
+
+- Isolation stricte par `entreprise_source + entreprise_reference`
+- Resolver serveur pour le contexte entreprise, avec refus par défaut si absent
+- Dépenses, budgets, avances, centres de coût et audit scindés par entreprise
+- Catégories globales partageables et catégories propres à chaque entreprise
+- Codes catégories/centres de coût/références d'avance uniques par entreprise
+- API, rapports et Django Admin scindés par entreprise
+- Migration `0005_multi_entreprise`
+- Commande `assign_legacy_entreprise` pour rattacher les anciennes données
+- Seed/templates de catégories sécurisés par entreprise
+- Tests d'isolation inter-entreprises
+
+
 ## 0.2.0 (2026-09-30)
 
 ### Financial correctness

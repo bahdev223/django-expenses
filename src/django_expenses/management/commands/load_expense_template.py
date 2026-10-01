@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from ...constants import TEMPLATES as SOURCE_TEMPLATES
@@ -16,6 +16,9 @@ class Command(BaseCommand):
             choices=list(SOURCE_TEMPLATES.keys()) + ["list"],
             help="Template name to load",
         )
+        parser.add_argument("--entreprise-source", default="")
+        parser.add_argument("--entreprise-reference", default="")
+        parser.add_argument("--entreprise-libelle", default="")
         parser.add_argument(
             "--force",
             action="store_true",
@@ -51,7 +54,7 @@ class Command(BaseCommand):
         for entry in template["categories"]:
             data = dict(zip(fields, entry))
             code = data["code"]
-            if ExpenseCategory.objects.filter(code=code).exists():
+            if ExpenseCategory.objects.filter(code=code, **scope).exists():
                 self.stdout.write(f"  SKIP {code} (already exists)")
                 continue
 
@@ -60,7 +63,10 @@ class Command(BaseCommand):
                 parent = parent_cache.get(data["parent_code"])
                 if not parent:
                     try:
-                        parent = ExpenseCategory.objects.get(code=data["parent_code"])
+                        parent = ExpenseCategory.objects.get(
+                            code=data["parent_code"],
+                            **scope,
+                        )
                     except ExpenseCategory.DoesNotExist:
                         self.stdout.write(
                             self.style.WARNING(
@@ -70,6 +76,9 @@ class Command(BaseCommand):
                         continue
 
             category = ExpenseCategory.objects.create(
+                entreprise_source=source,
+                entreprise_reference=reference,
+                entreprise_libelle=libelle,
                 code=code,
                 name=data["name"],
                 parent=parent,

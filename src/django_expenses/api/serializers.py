@@ -1,5 +1,8 @@
 from rest_framework import serializers
 
+from ..settings import EXPENSES
+from ..tenancy import resoudre_entreprise
+
 from ..models import (
     Expense,
     ExpenseCategory,
@@ -27,6 +30,22 @@ class ExpenseCategorySerializer(serializers.ModelSerializer):
 
     def get_children_count(self, obj):
         return obj.children.filter(is_active=True).count()
+
+    def validate(self, attrs):
+        contexte = resoudre_entreprise(
+            self.context.get("request"),
+            required=EXPENSES["ENABLE_MULTI_ENTREPRISE"],
+        )
+        parent = attrs.get("parent", getattr(self.instance, "parent", None))
+        if contexte and parent and not parent.est_globale:
+            if (
+                parent.entreprise_source != contexte.source
+                or parent.entreprise_reference != contexte.reference
+            ):
+                raise serializers.ValidationError({
+                    "parent": "La catégorie parente appartient à une autre entreprise."
+                })
+        return attrs
 
 
 class ExpenseCategoryTreeSerializer(serializers.ModelSerializer):
@@ -167,8 +186,18 @@ class BudgetDepenseSerializer(serializers.ModelSerializer):
                     "projet_source et projet_reference doivent être renseignés ensemble."
                 )
             })
-        entreprise_source = getattr(self.instance, "entreprise_source", "")
-        entreprise_reference = getattr(self.instance, "entreprise_reference", "")
+        contexte = resoudre_entreprise(
+            self.context.get("request"),
+            required=EXPENSES["ENABLE_MULTI_ENTREPRISE"],
+        )
+        entreprise_source = (
+            contexte.source if contexte
+            else getattr(self.instance, "entreprise_source", "")
+        )
+        entreprise_reference = (
+            contexte.reference if contexte
+            else getattr(self.instance, "entreprise_reference", "")
+        )
         categorie = attrs.get("categorie", getattr(self.instance, "categorie", None))
         if categorie and (categorie.entreprise_source or categorie.entreprise_reference):
             if (

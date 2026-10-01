@@ -4,6 +4,9 @@ from django.utils.translation import gettext_lazy as _
 
 
 class EvenementDepense(models.Model):
+    entreprise_source = models.CharField(max_length=80, blank=True, db_index=True)
+    entreprise_reference = models.CharField(max_length=120, blank=True, db_index=True)
+    entreprise_libelle = models.CharField(max_length=240, blank=True)
     depense = models.ForeignKey(
         "Expense",
         on_delete=models.SET_NULL,

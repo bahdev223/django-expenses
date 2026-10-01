@@ -75,6 +75,13 @@ class ExpenseCategory(models.Model):
                 fields=["entreprise_source", "entreprise_reference", "code"],
                 name="expense_category_code_par_entreprise",
             ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(entreprise_source="", entreprise_reference="")
+                    | (~models.Q(entreprise_source="") & ~models.Q(entreprise_reference=""))
+                ),
+                name="expense_category_entreprise_coherente",
+            ),
         ]
 
     @property

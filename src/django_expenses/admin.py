@@ -285,7 +285,7 @@ class ExpenseCategoryAdmin(EntrepriseAdminMixin, admin.ModelAdmin):
     ]
     list_filter = ["expense_nature", "is_active", "requires_approval", "requires_receipt", "requires_vendor"]
     search_fields = ["code", "name", "default_account_code"]
-    list_editable = ["sort_order", "is_active"]
+    list_editable = []
 
 
 @admin.register(CostCenter)
